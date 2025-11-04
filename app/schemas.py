@@ -109,3 +109,21 @@ class NiveauResponseSchema(BaseModel):
 class NiveauCreateRequest(BaseModel):
     designation : str
 
+
+# ==================== SCHEMAS CATEGORI (CRUD) ====================
+class CategoriResponseSchema(BaseModel):
+    id: int
+    designation : str
+    slug: Optional[str] = None
+    type: Optional[str] = None
+    montant: float
+    contenu_notif: Optional[str] = None
+    is_visible: bool
+
+class CategoriCreateRequest(BaseModel):
+    designation: str
+    slug: str
+    type: str
+    montant: float
+    contenu_notif: str
+    is_visible: bool

@@ -107,6 +107,7 @@ class Categori(Base):
     type = Column(String, nullable=True)  # att/crt or null
     montant = Column(Float, nullable=False)
     contenu_notif = Column(String, nullable=True)
+    is_visible = Column(Boolean, default=True)
 
     # Relations
     documents = relationship("Document", back_populates="categorie")

@@ -14,7 +14,8 @@ from app.schemas import (
     UserCreate, UserResponse, UserUpdate, Token, LoginRequest,
     DocumentRequestCreate, DocumentRequestResponse, DocumentRequestUpdate,
     MultipleRequestsCreate, NotificationMessage,
-    NiveauResponseSchema, NiveauCreateRequest
+    NiveauResponseSchema, NiveauCreateRequest,
+    CategoriCreateRequest, CategoriResponseSchema,
 )
 from app.auth import (
     authenticate_user, create_access_token, get_current_active_user,
@@ -26,7 +27,8 @@ from app.crud import (
     create_document_request, create_multiple_document_requests,
     get_document_request_by_id, get_all_document_requests,
     get_user_document_requests, update_document_request, delete_document_request,
-    get_all_niveau, create_niveau, update_niveau, delete_niveau
+    get_all_niveau, create_niveau, update_niveau, delete_niveau, get_a_niveau,
+    get_a_categori, get_all_categori,
 )
 from app.services.websocket_manager import manager
 
@@ -283,8 +285,18 @@ def read_requests(
     result = get_all_niveau(db)
     return result
 
+@app.get("/niveau/{niveau_id}", response_model=NiveauResponseSchema)
+def read_unique_requests(
+    niveau_id: int,
+    db: Session = Depends(get_db),
+    # current_user: User = Depends(get_current_active_user)
+):
+    result = get_a_niveau(db, niveau_id)
+    return result
+
+
 @app.post("/niveau", response_model=NiveauResponseSchema, status_code=HTTP_201_CREATED)
-def read_requests(
+def create_niveau_requests(
     request_data: NiveauCreateRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
@@ -293,7 +305,7 @@ def read_requests(
     return result
 
 @app.put("/niveau/{niveau_id}", response_model=NiveauResponseSchema, status_code=HTTP_200_OK)
-def read_requests(
+def update_niveau_requests(
     niveau_id: int,
     request_data: NiveauCreateRequest,
     db: Session = Depends(get_db),
@@ -303,7 +315,7 @@ def read_requests(
     return result
 
 @app.delete("/niveau/{niveau_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_request(
+async def delete_niveau_request(
     niveau_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
@@ -313,11 +325,24 @@ async def delete_request(
     if not success:
         raise HTTPException(status_code=404, detail="Niveau not found")
 
-
-
-
-
 # ==================== ROUTES CATEGORIES (CRUD) ====================
+@app.get("/categori", response_model=List[CategoriResponseSchema])
+def read_requests(
+    db: Session = Depends(get_db),
+    # current_user: User = Depends(get_current_active_user)
+):
+    result = get_all_categori(db)
+    return result
+
+@app.get("/categori/{categori_id}", response_model=CategoriResponseSchema)
+def read_unique_requests(
+    categori_id: int,
+    db: Session = Depends(get_db),
+    # current_user: User = Depends(get_current_active_user)
+):
+    result = get_a_categori(db, categori_id)
+    return result
+
 
 
 

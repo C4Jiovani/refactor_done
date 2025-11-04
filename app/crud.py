@@ -222,7 +222,7 @@ def delete_document_request(db: Session, request_id: int) -> bool:
 # Alias pour compatibilité
 DocumentRequest = Document
 
-# ==================== ROUTES NIVEAU (CRUD) ====================
+# ==================== FUNCTION NIVEAU (CRUD) ====================
 def get_all_niveau(db:Session) -> List[Niveau]:
     stmt = select(Niveau)
     result = db.execute(stmt)
@@ -270,4 +270,15 @@ def delete_niveau(db: Session, niveau_id: int) -> bool:
     db.commit()
     return True
 
+# ==================== FUNCTION NIVEAU (CRUD) ====================
+def get_all_categori(db:Session) -> List[Categori]:
+    stmt = select(Categori)
+    result = db.execute(stmt)
+    categories = result.scalars().all()
+    return categories
 
+def get_a_categori(db:Session, categori_id: int) -> Categori|None:
+    stmt = select(Categori).where(Categori.id == categori_id)
+    result = db.execute(stmt)
+    categories = result.scalar_one_or_none()
+    return categories
