@@ -61,7 +61,7 @@ Cela créera les tables et un utilisateur admin par défaut.
 ## 🏃 Lancer l'application
 
 ```bash
-uvicorn main:app --reload
+uvicorn app.main:app --reload
 ```
 
 L'API sera accessible sur `http://localhost:8000`
