@@ -116,6 +116,8 @@ class CategoriResponseSchema(BaseModel):
     designation : str
     slug: Optional[str] = None
     type: Optional[str] = None
+    icon: Optional[str] = None
+    path: Optional[str] = None
     montant: float
     contenu_notif: Optional[str] = None
     is_visible: bool
@@ -124,6 +126,8 @@ class CategoriCreateRequest(BaseModel):
     designation: str
     slug: str
     type: str
+    icon: str
+    path: str
     montant: float
     contenu_notif: str
     is_visible: bool

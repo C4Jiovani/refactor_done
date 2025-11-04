@@ -27,7 +27,7 @@ from app.crud import (
     get_document_request_by_id, get_all_document_requests,
     get_user_document_requests, update_document_request, delete_document_request,
     get_all_niveau, create_niveau, update_niveau, delete_niveau, get_a_niveau,
-    get_a_categori, get_all_categori,
+    get_a_categori, get_all_categori, create_categori, update_categori, delete_categori
 )
 from app.services.websocket_manager import manager
 
@@ -303,6 +303,7 @@ def create_niveau_requests(
     result = create_niveau(db, request_data)
     return result
 
+
 @app.put("/niveau/{niveau_id}", response_model=NiveauResponseSchema, status_code=HTTP_200_OK)
 def update_niveau_requests(
     niveau_id: int,
@@ -341,6 +342,44 @@ def read_unique_requests(
 ):
     result = get_a_categori(db, categori_id)
     return result
+
+
+@app.post("/categori", response_model=CategoriResponseSchema, status_code=HTTP_201_CREATED)
+def create_niveau_requests(
+    request_data: CategoriCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    result = create_categori(db, request_data)
+    return result
+
+@app.put("/categori/{categori_id}", response_model=CategoriResponseSchema, status_code=HTTP_200_OK)
+def update_categori_requests(
+    categori_id: int,
+    request_data: CategoriCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    result = update_categori(db, request_data, categori_id)
+    return result
+
+@app.delete("/categori/{categori_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_categori_request(
+    categori_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Supprime une demande (admin seulement)"""
+    success = delete_categori(db, categori_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Categori not found")
+
+
+
+
+
+
+
 
 
 

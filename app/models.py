@@ -105,6 +105,8 @@ class Categori(Base):
     designation = Column(String, unique=True, nullable=False)
     slug = Column(String, unique=False, nullable=True)
     type = Column(String, nullable=True)  # att/crt or null
+    icon = Column(String, nullable=True)  # Component iconName
+    path = Column(String, nullable=True)  # frontend url
     montant = Column(Float, nullable=False)
     contenu_notif = Column(String, nullable=True)
     is_visible = Column(Boolean, default=True)

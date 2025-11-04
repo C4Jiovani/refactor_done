@@ -5,6 +5,7 @@ from app.models import User, Document, UserRole, DocumentStatus, Categori, Nivea
 from app.schemas import (
     UserCreate, UserUpdate, DocumentRequestCreate, DocumentRequestUpdate,
     NiveauCreateRequest,
+    CategoriCreateRequest,
 )
 from app.auth import get_password_hash
 from typing import List, Optional
@@ -282,3 +283,54 @@ def get_a_categori(db:Session, categori_id: int) -> Categori|None:
     result = db.execute(stmt)
     categories = result.scalar_one_or_none()
     return categories
+
+def create_categori(db:Session, request: CategoriCreateRequest) -> Categori | None:
+    try:
+        db_request = Categori(
+            designation=request.designation,
+            slug=request.slug,
+            type=request.type,
+            icon=request.icon,
+            path=request.path,
+            montant=request.montant,
+            contenu_notif=request.contenu_notif,
+            is_visible=True,
+        )
+        db.add(db_request)
+        db.commit()
+        db.refresh(db_request)
+        return db_request
+    except IntegrityError:
+        db.rollback()
+        return None
+
+def update_categori(db:Session, request: CategoriCreateRequest, categori_id: int) -> Categori | None:
+    try:
+        categori = get_a_categori(db, categori_id)
+        if categori is None:
+            return None
+
+        categori.designation = request.designation
+        categori.slug = request.slug
+        categori.type = request.type
+        categori.icon = request.icon
+        categori.path = request.path
+        categori.montant = request.montant
+        categori.contenu_notif = request.contenu_notif
+        categori.is_visible = request.is_visible
+
+        db.commit()
+        db.refresh(categori)
+        return categori
+    except IntegrityError:
+        db.rollback()
+        return None
+
+def delete_categori(db: Session, categori_id: int) -> bool:
+    """Supprime une demande"""
+    db_request = db.query(Categori).filter(Categori.id == categori_id).first()
+    if not db_request:
+        return False
+    db.delete(db_request)
+    db.commit()
+    return True

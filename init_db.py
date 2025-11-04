@@ -45,20 +45,26 @@ def init_db():
                 "designation": "RELEVER DE NOTE",
                 "slug": "releve_note",
                 "type": None,
+                "icon": "Test",
+                "path": "/url",
                 "montant": 2000.0,
                 "contenu_notif": "Votre relevé de notes est prêt et disponible."
             },
             {
                 "designation": "ATTESTATION DE REUSSITE",
-                "montant": 3000.0,
                 "slug": "attestation_reussite",
                 "type": "att",
+                "icon": "Test",
+                "path": "/url",
+                "montant": 3000.0,
                 "contenu_notif": "Votre attestation de réussite est prête et disponible."
             },
             {
                 "designation": "CERTIFICAT DE FIN D'ETUDE",
                 "slug": "certificate_fin_etude",
                 "type": "crt",
+                "icon": "Test",
+                "path": "/url",
                 "montant": 3000.0,
                 "contenu_notif": "Votre certificat de fin d'étude est prêt et disponible."
             }
