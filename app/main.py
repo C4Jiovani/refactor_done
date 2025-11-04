@@ -1,4 +1,3 @@
-from dns.dnssec import allow_all_policy
 from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
