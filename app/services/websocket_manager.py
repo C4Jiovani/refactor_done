@@ -10,21 +10,21 @@ class ConnectionManager:
         # Dictionnaire pour stocker les connexions : {user_id: {websocket1, websocket2, ...}}
         self.active_connections: Dict[int, Set[WebSocket]] = {}
     
-    async def connect(self, websocket: WebSocket, user_id: int):
+    async def connect(self, websocket: WebSocket, user_id: str):
         """Connecte un utilisateur via WebSocket"""
         await websocket.accept()
         if user_id not in self.active_connections:
             self.active_connections[user_id] = set()
         self.active_connections[user_id].add(websocket)
     
-    def disconnect(self, websocket: WebSocket, user_id: int):
+    def disconnect(self, websocket: WebSocket, user_id: str):
         """Déconnecte un utilisateur"""
         if user_id in self.active_connections:
             self.active_connections[user_id].discard(websocket)
             if not self.active_connections[user_id]:
                 del self.active_connections[user_id]
     
-    async def send_personal_message(self, message: dict, user_id: int):
+    async def send_personal_message(self, message: dict, user_id: str):
         """Envoie un message à un utilisateur spécifique"""
         if user_id in self.active_connections:
             disconnected = set()
