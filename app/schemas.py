@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, UUID4
 from datetime import datetime
 from typing import Optional, List
 
@@ -20,7 +20,7 @@ class UserCreate(UserBase):
 
 
 class UserResponse(UserBase):
-    id: int
+    id: UUID4
     matricule: str
     nom: str
     prenom: str
@@ -70,7 +70,7 @@ class DocumentRequestCreate(DocumentRequestBase):
 
 class DocumentRequestResponse(DocumentRequestBase):
     id: int
-    user_id: int
+    user_id: UUID4
     status: str
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -101,4 +101,29 @@ class NotificationMessage(BaseModel):
     message: str
     data: Optional[dict] = None
 
+# ==================== SCHEMAS NIVEAU (CRUD) ====================
+class NiveauResponseSchema(BaseModel):
+    id: int
+    designation : str
 
+class NiveauCreateRequest(BaseModel):
+    designation : str
+
+
+# ==================== SCHEMAS CATEGORI (CRUD) ====================
+class CategoriResponseSchema(BaseModel):
+    id: int
+    designation : str
+    slug: Optional[str] = None
+    type: Optional[str] = None
+    montant: float
+    contenu_notif: Optional[str] = None
+    is_visible: bool
+
+class CategoriCreateRequest(BaseModel):
+    designation: str
+    slug: str
+    type: str
+    montant: float
+    contenu_notif: str
+    is_visible: bool

@@ -1,7 +1,11 @@
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_
-from app.models import User, Document, UserRole, DocumentStatus, Categori
-from app.schemas import UserCreate, UserUpdate, DocumentRequestCreate, DocumentRequestUpdate
+from sqlalchemy import and_, select
+from sqlalchemy.exc import IntegrityError
+from app.models import User, Document, UserRole, DocumentStatus, Categori, Niveau
+from app.schemas import (
+    UserCreate, UserUpdate, DocumentRequestCreate, DocumentRequestUpdate,
+    NiveauCreateRequest,
+)
 from app.auth import get_password_hash
 from typing import List, Optional
 import secrets
@@ -53,7 +57,7 @@ def get_user_by_matricule(db: Session, matricule: str) -> Optional[User]:
     return db.query(User).filter(User.matricule == matricule).first()
 
 
-def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
+def get_user_by_id(db: Session, user_id: str) -> Optional[User]:
     """Récupère un utilisateur par son ID"""
     return db.query(User).filter(User.id == user_id).first()
 
@@ -68,7 +72,7 @@ def get_pending_users(db: Session) -> List[User]:
     return db.query(User).filter(User.is_active == False, User.is_deleted == False).all()
 
 
-def update_user(db: Session, user_id: int, user_update: UserUpdate) -> Optional[User]:
+def update_user(db: Session, user_id: str, user_update: UserUpdate) -> Optional[User]:
     """Met à jour un utilisateur"""
     db_user = db.query(User).filter(User.id == user_id).first()
     if not db_user:
@@ -93,7 +97,7 @@ def update_user(db: Session, user_id: int, user_update: UserUpdate) -> Optional[
     return db_user
 
 
-def delete_user(db: Session, user_id: int) -> bool:
+def delete_user(db: Session, user_id: str) -> bool:
     """Soft delete d'un utilisateur"""
     db_user = db.query(User).filter(User.id == user_id).first()
     if not db_user:
@@ -129,7 +133,7 @@ def create_document_request(db: Session, request: DocumentRequestCreate, user_id
     return db_request
 
 
-def create_multiple_document_requests(db: Session, document_types: List[str], user_id: int) -> List[Document]:
+def create_multiple_document_requests(db: Session, document_types: List[str], user_id: str) -> List[Document]:
     """Crée plusieurs demandes de documents en une seule fois"""
     db_requests = []
     for doc_type in document_types:
@@ -142,7 +146,7 @@ def create_multiple_document_requests(db: Session, document_types: List[str], us
         
         if categorie:
             db_request = Document(
-                user_id=user_id,
+                user_id=str(user_id),
                 categorie_id=categorie.id,
                 status=DocumentStatus.PENDING.value,
                 est_paye=False
@@ -218,4 +222,63 @@ def delete_document_request(db: Session, request_id: int) -> bool:
 # Alias pour compatibilité
 DocumentRequest = Document
 
+# ==================== FUNCTION NIVEAU (CRUD) ====================
+def get_all_niveau(db:Session) -> List[Niveau]:
+    stmt = select(Niveau)
+    result = db.execute(stmt)
+    niveaux = result.scalars().all()
+    return niveaux
 
+def get_a_niveau(db:Session, niveau_id: int) -> Niveau|None:
+    stmt = select(Niveau).where(Niveau.id == niveau_id)
+    result = db.execute(stmt)
+    niveaux = result.scalar_one_or_none()
+    return niveaux
+
+def create_niveau(db:Session, request: NiveauCreateRequest) -> Niveau | None:
+    try:
+        db_request = Niveau(designation=request.designation)
+        db.add(db_request)
+        db.commit()
+        db.refresh(db_request)
+        return db_request
+    except IntegrityError:
+        db.rollback()
+        return None
+
+
+def update_niveau(db:Session, request: NiveauCreateRequest, niveau_id: int) -> Niveau | None:
+    try:
+        niveau = get_a_niveau(db, niveau_id)
+        if niveau is None:
+            return None
+
+        niveau.designation = request.designation
+        db.commit()
+        db.refresh(niveau)
+        return niveau
+    except IntegrityError:
+        db.rollback()
+        return None
+
+def delete_niveau(db: Session, niveau_id: int) -> bool:
+    """Supprime une demande"""
+    db_request = db.query(Niveau).filter(Niveau.id == niveau_id).first()
+    if not db_request:
+        return False
+    db.delete(db_request)
+    db.commit()
+    return True
+
+# ==================== FUNCTION NIVEAU (CRUD) ====================
+def get_all_categori(db:Session) -> List[Categori]:
+    stmt = select(Categori)
+    result = db.execute(stmt)
+    categories = result.scalars().all()
+    return categories
+
+def get_a_categori(db:Session, categori_id: int) -> Categori|None:
+    stmt = select(Categori).where(Categori.id == categori_id)
+    result = db.execute(stmt)
+    categories = result.scalar_one_or_none()
+    return categories

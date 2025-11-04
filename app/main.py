@@ -1,15 +1,21 @@
+from dns.dnssec import allow_all_policy
 from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from typing import List
 
+from starlette.status import HTTP_201_CREATED, HTTP_200_OK
+
 from app.database import get_db, engine, Base
-from app.models import User, Document
+from app.models import User, Document, Niveau
 from app.schemas import (
     UserCreate, UserResponse, UserUpdate, Token, LoginRequest,
     DocumentRequestCreate, DocumentRequestResponse, DocumentRequestUpdate,
-    MultipleRequestsCreate, NotificationMessage
+    MultipleRequestsCreate, NotificationMessage,
+    NiveauResponseSchema, NiveauCreateRequest,
+    CategoriCreateRequest, CategoriResponseSchema,
 )
 from app.auth import (
     authenticate_user, create_access_token, get_current_active_user,
@@ -20,7 +26,9 @@ from app.crud import (
     get_pending_users, update_user, delete_user,
     create_document_request, create_multiple_document_requests,
     get_document_request_by_id, get_all_document_requests,
-    get_user_document_requests, update_document_request, delete_document_request
+    get_user_document_requests, update_document_request, delete_document_request,
+    get_all_niveau, create_niveau, update_niveau, delete_niveau, get_a_niveau,
+    get_a_categori, get_all_categori,
 )
 from app.services.websocket_manager import manager
 
@@ -79,7 +87,7 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
+        data={"sub": user.email, "id": str(user.id), "type": user.type}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -116,7 +124,7 @@ async def read_pending_users(
 
 @app.get("/users/{user_id}", response_model=UserResponse)
 async def read_user(
-    user_id: int,
+    user_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
 ):
@@ -129,12 +137,13 @@ async def read_user(
 
 @app.put("/users/{user_id}", response_model=UserResponse)
 async def update_user_endpoint(
-    user_id: int,
+    user_id: str,
     user_update: UserUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
 ):
     """Met à jour un utilisateur (admin seulement)"""
+    print(user_id)
     db_user = update_user(db, user_id=user_id, user_update=user_update)
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
@@ -148,13 +157,13 @@ async def update_user_endpoint(
             "data": {"user_id": user_id, "is_active": user_update.is_active}
         }
         await manager.send_personal_message(notification_message, user_id)
-    
+    db_user.id = str(db_user.id)
     return db_user
 
 
 @app.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user_endpoint(
-    user_id: int,
+    user_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
 ):
@@ -182,7 +191,7 @@ async def create_requests(
     db_requests = create_multiple_document_requests(
         db=db,
         document_types=requests_data.document_types,
-        user_id=current_user.id
+        user_id=str(current_user.id)
     )
     
     return db_requests
@@ -266,10 +275,82 @@ async def delete_request(
         raise HTTPException(status_code=404, detail="Request not found")
 
 
+
+# ==================== ROUTES NIVEAU (CRUD) ====================
+@app.get("/niveau", response_model=List[NiveauResponseSchema])
+def read_requests(
+    db: Session = Depends(get_db),
+    # current_user: User = Depends(get_current_active_user)
+):
+    result = get_all_niveau(db)
+    return result
+
+@app.get("/niveau/{niveau_id}", response_model=NiveauResponseSchema)
+def read_unique_requests(
+    niveau_id: int,
+    db: Session = Depends(get_db),
+    # current_user: User = Depends(get_current_active_user)
+):
+    result = get_a_niveau(db, niveau_id)
+    return result
+
+
+@app.post("/niveau", response_model=NiveauResponseSchema, status_code=HTTP_201_CREATED)
+def create_niveau_requests(
+    request_data: NiveauCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    result = create_niveau(db, request_data)
+    return result
+
+@app.put("/niveau/{niveau_id}", response_model=NiveauResponseSchema, status_code=HTTP_200_OK)
+def update_niveau_requests(
+    niveau_id: int,
+    request_data: NiveauCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    result = update_niveau(db, request_data, niveau_id)
+    return result
+
+@app.delete("/niveau/{niveau_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_niveau_request(
+    niveau_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Supprime une demande (admin seulement)"""
+    success = delete_niveau(db, niveau_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Niveau not found")
+
+# ==================== ROUTES CATEGORIES (CRUD) ====================
+@app.get("/categori", response_model=List[CategoriResponseSchema])
+def read_requests(
+    db: Session = Depends(get_db),
+    # current_user: User = Depends(get_current_active_user)
+):
+    result = get_all_categori(db)
+    return result
+
+@app.get("/categori/{categori_id}", response_model=CategoriResponseSchema)
+def read_unique_requests(
+    categori_id: int,
+    db: Session = Depends(get_db),
+    # current_user: User = Depends(get_current_active_user)
+):
+    result = get_a_categori(db, categori_id)
+    return result
+
+
+
+
+
 # ==================== ROUTES WEBSOCKET ====================
 
 @app.websocket("/ws/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, user_id: int):
+async def websocket_endpoint(websocket: WebSocket, user_id: str):
     """Endpoint WebSocket pour les notifications en temps réel"""
     await manager.connect(websocket, user_id)
     try:
