@@ -24,7 +24,7 @@ from app.auth import (
 from app.crud import (
     create_user, get_user_by_email, get_user_by_id, get_all_users,
     get_pending_users, update_user, delete_user,
-    create_document_request, create_multiple_document_requests,
+    create_document_request,
     get_document_request_by_id, get_all_document_requests, get_document_requests_filtered,
     get_user_document_requests, update_document_request, delete_document_request,
     get_all_niveau, create_niveau, update_niveau, delete_niveau, get_a_niveau,
