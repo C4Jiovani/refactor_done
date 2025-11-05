@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session, joinedload, selectinload
-from sqlalchemy import and_, select, func
+from sqlalchemy import and_, select, func, any_
 from sqlalchemy.exc import IntegrityError
 from app.models import User, Document, UserRole, DocumentStatus, Categori, Niveau
 from app.schemas import (
@@ -11,6 +11,7 @@ from app.auth import get_password_hash
 from typing import List, Optional
 import secrets
 import math
+from datetime import datetime
 
 
 # CRUD pour User
@@ -205,7 +206,7 @@ def get_document_requests_filtered(
     # --- 1. Requête de base ---
     # Démarre la sélection des Documents avec jointures pour éviter les requêtes N+1
     stmt = select(Document).options(
-        selectinload(Document.categorie),
+        selectinload(Document.categories),
         selectinload(Document.user),
         selectinload(Document.infosupps)
     )
@@ -221,7 +222,8 @@ def get_document_requests_filtered(
     if filters.status:
         conditions.append(Document.status == filters.status)
     if filters.categorie_id is not None:
-        conditions.append(Document.categorie_id == filters.categorie_id)
+        # conditions.append(Document.categorie_id == filters.categorie_id)
+        conditions.append(Document.categories.any(Categori.id.in_(filters.categorie_id)))
     if filters.start_date:
         conditions.append(Document.date_de_demande >= filters.start_date)
     if filters.end_date:
@@ -288,7 +290,7 @@ def get_document_requests_filtered(
 
 def update_document_request(db: Session, request_id: int, request_update: DocumentRequestUpdate) -> Optional[Document]:
     """Met à jour une demande"""
-    db_request = db.query(Document).options(joinedload(Document.categorie), joinedload(Document.user)).filter(Document.id == request_id).first()
+    db_request = db.query(Document).options(joinedload(Document.categories), joinedload(Document.user)).filter(Document.id == request_id).first()
     if not db_request:
         return None
     
@@ -298,22 +300,21 @@ def update_document_request(db: Session, request_id: int, request_update: Docume
         if field == 'status' and value:
             # Convertir les anciennes valeurs vers les nouvelles
             status_mapping = {
-                'en attente': DocumentStatus.PENDING.value,
+                # 'en attente': DocumentStatus.PENDING.value,
                 'pending': DocumentStatus.PENDING.value,
-                'validée': DocumentStatus.VALIDATE.value,
+                # 'validée': DocumentStatus.VALIDATE.value,
                 'validate': DocumentStatus.VALIDATE.value,
-                'refusée': DocumentStatus.REFUSE.value,
-                'refuse': DocumentStatus.REFUSE.value
+                # 'refusée': DocumentStatus.REFUSE.value,
+                'refused': DocumentStatus.REFUSE.value
             }
             value = status_mapping.get(value.lower(), value)
         setattr(db_request, field, value)
-    
-    from datetime import datetime
-    db_request.updated_at = datetime.utcnow()
+
+    db_request.updated_at = datetime.now()
     
     # Si le statut passe à validé, mettre à jour date_de_validation
     if update_data.get('status') == DocumentStatus.VALIDATE.value:
-        db_request.date_de_validation = datetime.utcnow()
+        db_request.date_de_validation = datetime.now()
     
     db.commit()
     db.refresh(db_request)

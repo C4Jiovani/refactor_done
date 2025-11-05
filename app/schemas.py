@@ -106,15 +106,38 @@ class CategoriCreateRequest(BaseModel):
     is_visible: bool
 
 # ==================== SCHEMAS DEMANDE (CRUD) ====================
+class DocumentCreateSchema(BaseModel):
+    """Schéma Pydantic pour la création d'une seule demande de document."""
+    pere: Optional[str] = None
+    mere: Optional[str] = None
+    categorie_ids: List[int] = Field(
+        ...,
+        description="Liste des IDs des catégories à associer au document."
+    )
+    infosupps: Optional[List[InfoSuppSchema]] = None  # Pour la création des InfoSupps
+
+    # user_id: UUID4
+    # numero: Optional[str] = None
+    # date_de_demande: datetime
+    # date_de_validation: Optional[datetime] = None
+    # status: str
+    # est_paye: bool
+    # created_at: datetime
+    # updated_at: Optional[datetime] = None
+    # user: Optional[UserResponse] = None
+    # infosupps: Optional[List[InfoSuppSchema]] = None
+    # categorie: Optional[CategoriResponseSchema] = None
+    # --- NOUVEAU CHAMP POUR M2M ---
+    # Le frontend envoie une liste d'IDs
+
 
 # Mise à jour du Schéma de Filtre
 class DocumentRequestFilter(BaseModel):
     """Schéma Pydantic pour les paramètres de filtrage des demandes de documents."""
 
-    # ... (Autres filtres conservés) ...
     search_term: Optional[str] = Field(None, description="Terme de recherche libre: Nom, Matricule, ou Numéro de document.")
     status: Optional[str] = Field(None, description="Filtrer par statut du document (ex: PENDING, APPROVED).")
-    categorie_id: Optional[int] = Field(None, description="Filtrer par ID de catégorie du document.")
+    categorie_id: Optional[List[int]] = Field(None, description="Filtrer par ID de catégorie du document.")
     start_date: Optional[date] = Field(None, description="Date de début pour le filtre de période (inclusif).")
     end_date: Optional[date] = Field(None, description="Date de fin pour le filtre de période (inclusif).")
 
@@ -138,7 +161,7 @@ class DocumentRequestResponse(DocumentRequestBase):
     updated_at: Optional[datetime] = None
     user: Optional[UserResponse] = None
     infosupps: Optional[List[InfoSuppSchema]] = None
-    categorie: Optional[CategoriResponseSchema] = None
+    categories: Optional[List[CategoriResponseSchema]] = None
 
     class Config:
         from_attributes = True
@@ -149,7 +172,8 @@ class PaginatedDocumentRequestResponse(BaseModel):
     pagination: PaginationMeta
 
 class DocumentRequestUpdate(BaseModel):
-    status: Optional[str] = None
+    status: Optional[str] = None # pending, validate, refused
+    est_paye: Optional[bool] = None
 
 
 # Schéma pour créer plusieurs demandes en une fois

@@ -11,7 +11,8 @@ from app.database import get_db, engine, Base
 from app.models import User, Document, Niveau
 from app.schemas import (
     UserCreate, UserResponse, UserUpdate, Token, LoginRequest,
-    DocumentRequestCreate, DocumentRequestResponse, DocumentRequestUpdate, DocumentRequestFilter, PaginatedDocumentRequestResponse,
+    DocumentRequestCreate, DocumentRequestResponse, DocumentRequestUpdate,
+    DocumentRequestFilter, PaginatedDocumentRequestResponse, DocumentCreateSchema,
     MultipleRequestsCreate, NotificationMessage,
     NiveauResponseSchema, NiveauCreateRequest,
     CategoriCreateRequest, CategoriResponseSchema,
@@ -176,17 +177,13 @@ async def delete_user_endpoint(
 
 @app.post("/requests", response_model=List[DocumentRequestResponse], status_code=status.HTTP_201_CREATED)
 async def create_requests(
-    requests_data: MultipleRequestsCreate,
+    requests_data: DocumentCreateSchema,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
+    # requests_data: MultipleRequestsCreate,
     """Crée une ou plusieurs demandes de documents en une seule requête"""
-    if not requests_data.document_types:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="At least one document type is required"
-        )
-    
+
     db_requests = create_multiple_document_requests(
         db=db,
         document_types=requests_data.document_types,
@@ -197,7 +194,7 @@ async def create_requests(
 
 
 @app.get("/requests", response_model=List[DocumentRequestResponse])
-async def read_requests(
+async def read_demand_requests(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
@@ -212,7 +209,7 @@ async def read_requests(
     return requests
 
 @app.get("/requests/all", response_model=PaginatedDocumentRequestResponse)
-async def read_all_requests(
+async def read_demand_all_requests(
     filters: DocumentRequestFilter = Depends(),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -236,7 +233,7 @@ async def read_all_requests(
 
 
 @app.get("/requests/{request_id}", response_model=DocumentRequestResponse)
-async def read_request(
+async def read_single_demand_request(
     request_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -264,7 +261,7 @@ async def update_request(
     db_request = get_document_request_by_id(db, request_id=request_id)
     if db_request is None:
         raise HTTPException(status_code=404, detail="Request not found")
-    
+
     old_status = db_request.status
     updated_request = update_document_request(db, request_id=request_id, request_update=request_update)
     
@@ -275,13 +272,13 @@ async def update_request(
             "message": f"Le statut de votre demande a changé: {request_update.status}",
             "data": {
                 "request_id": request_id,
+                "est_paye": request_update.est_paye,
                 "old_status": old_status,
                 "new_status": request_update.status,
                 "document_type": updated_request.document_type
             }
         }
         await manager.send_personal_message(notification_message, updated_request.user_id)
-    
     return updated_request
 
 

@@ -42,7 +42,7 @@ def init_db():
         # Créer les catégories de documents
         categories = [
             {
-                "designation": "RELEVER DE NOTE",
+                "designation": "Relevé de notes",
                 "slug": "releve_note",
                 "type": None,
                 "icon": "FileCheck",
@@ -51,7 +51,7 @@ def init_db():
                 "contenu_notif": "Votre relevé de notes est prêt et disponible."
             },
             {
-                "designation": "CERTIFICAT DE SCOLARITE",
+                "designation": "Certificat de scolarité",
                 "slug": "certificate_scolarite",
                 "type": "crt",
                 "icon": "School",
@@ -60,7 +60,7 @@ def init_db():
                 "contenu_notif": "Votre certificat de scolarite est prêt et disponible."
             },
             {
-                "designation": "ATTESTATION DE FIN D'ETUDE",
+                "designation": "Attestation de fin d'études",
                 "slug": "attestation_fin_etude",
                 "type": "att",
                 "icon": "FileText",
@@ -69,7 +69,7 @@ def init_db():
                 "contenu_notif": "Votre attestation de fin d'étude est prêt et disponible."
             },
             {
-                "designation": "ATTESTATION DE REUSSITE",
+                "designation": "Attestation de réussite",
                 "slug": "attestation_reussite",
                 "type": "att",
                 "icon": "Award",
@@ -78,7 +78,7 @@ def init_db():
                 "contenu_notif": "Votre attestation de réussite est prête et disponible."
             },
             {
-                "designation": "ATTESTATION D'INSCRIPTION",
+                "designation": "Attestation d'inscription",
                 "slug": "attestation_inscription",
                 "type": "att",
                 "icon": "GraduationCap",
@@ -87,7 +87,7 @@ def init_db():
                 "contenu_notif": "Votre attestation d'inscription est prête et disponible."
             },
             {
-                "designation": "ATTESTATION DE DUREE DE FORMATION",
+                "designation": "Attestation de durée de formation",
                 "slug": "attestation_duree_formation",
                 "type": "att",
                 "icon": "Clock",
@@ -96,7 +96,7 @@ def init_db():
                 "contenu_notif": "Votre attestation de duree de formation est prête et disponible."
             },
             {
-                "designation": "ATTESTATION DE LANGUE FRANCAISE D'APPRENTISSAGE",
+                "designation": "Attestation de langue française",
                 "slug": "attestation_duree_formation",
                 "type": "att",
                 "icon": "Languages",
