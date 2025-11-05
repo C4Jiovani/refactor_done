@@ -11,7 +11,7 @@ from app.database import get_db, engine, Base
 from app.models import User, Document, Niveau
 from app.schemas import (
     UserCreate, UserResponse, UserUpdate, Token, LoginRequest,
-    DocumentRequestCreate, DocumentRequestResponse, DocumentRequestUpdate,
+    DocumentRequestCreate, DocumentRequestResponse, DocumentRequestUpdate, DocumentRequestFilter, PaginatedDocumentRequestResponse,
     MultipleRequestsCreate, NotificationMessage,
     NiveauResponseSchema, NiveauCreateRequest,
     CategoriCreateRequest, CategoriResponseSchema,
@@ -24,7 +24,7 @@ from app.crud import (
     create_user, get_user_by_email, get_user_by_id, get_all_users,
     get_pending_users, update_user, delete_user,
     create_document_request, create_multiple_document_requests,
-    get_document_request_by_id, get_all_document_requests,
+    get_document_request_by_id, get_all_document_requests, get_document_requests_filtered,
     get_user_document_requests, update_document_request, delete_document_request,
     get_all_niveau, create_niveau, update_niveau, delete_niveau, get_a_niveau,
     get_a_categori, get_all_categori, create_categori, update_categori, delete_categori
@@ -210,6 +210,29 @@ async def read_requests(
     else:
         requests = get_user_document_requests(db, user_id=current_user.id)
     return requests
+
+@app.get("/requests/all", response_model=PaginatedDocumentRequestResponse)
+async def read_all_requests(
+    filters: DocumentRequestFilter = Depends(),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Récupère les demandes de documents avec support de pagination et de filtres.
+    Retourne les données et les métadonnées de pagination.
+    """
+
+    documents, pagination_meta = get_document_requests_filtered(
+        db,
+        filters=filters,
+        current_user=current_user
+    )
+
+    # Construction de la réponse finale
+    return PaginatedDocumentRequestResponse(
+        data=documents,
+        pagination=pagination_meta
+    )
 
 
 @app.get("/requests/{request_id}", response_model=DocumentRequestResponse)

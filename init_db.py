@@ -45,29 +45,65 @@ def init_db():
                 "designation": "RELEVER DE NOTE",
                 "slug": "releve_note",
                 "type": None,
-                "icon": "Test",
-                "path": "/url",
+                "icon": "FileCheck",
+                "path": "/home/academic-transcript",
                 "montant": 2000.0,
                 "contenu_notif": "Votre relevé de notes est prêt et disponible."
+            },
+            {
+                "designation": "CERTIFICAT DE SCOLARITE",
+                "slug": "certificate_scolarite",
+                "type": "crt",
+                "icon": "School",
+                "path": "/home/school-certificate",
+                "montant": 2000.0,
+                "contenu_notif": "Votre certificat de scolarite est prêt et disponible."
+            },
+            {
+                "designation": "ATTESTATION DE FIN D'ETUDE",
+                "slug": "attestation_fin_etude",
+                "type": "att",
+                "icon": "FileText",
+                "path": "/home/completion-certificate",
+                "montant": 3000.0,
+                "contenu_notif": "Votre attestation de fin d'étude est prêt et disponible."
             },
             {
                 "designation": "ATTESTATION DE REUSSITE",
                 "slug": "attestation_reussite",
                 "type": "att",
-                "icon": "Test",
-                "path": "/url",
+                "icon": "Award",
+                "path": "/home/achievement-certificate",
                 "montant": 3000.0,
                 "contenu_notif": "Votre attestation de réussite est prête et disponible."
             },
             {
-                "designation": "CERTIFICAT DE FIN D'ETUDE",
-                "slug": "certificate_fin_etude",
-                "type": "crt",
-                "icon": "Test",
-                "path": "/url",
+                "designation": "ATTESTATION D'INSCRIPTION",
+                "slug": "attestation_inscription",
+                "type": "att",
+                "icon": "GraduationCap",
+                "path": "/home/enrollment-certificate",
                 "montant": 3000.0,
-                "contenu_notif": "Votre certificat de fin d'étude est prêt et disponible."
-            }
+                "contenu_notif": "Votre attestation d'inscription est prête et disponible."
+            },
+            {
+                "designation": "ATTESTATION DE DUREE DE FORMATION",
+                "slug": "attestation_duree_formation",
+                "type": "att",
+                "icon": "Clock",
+                "path": "/home/program-duration",
+                "montant": 3000.0,
+                "contenu_notif": "Votre attestation de duree de formation est prête et disponible."
+            },
+            {
+                "designation": "ATTESTATION DE LANGUE FRANCAISE D'APPRENTISSAGE",
+                "slug": "attestation_duree_formation",
+                "type": "att",
+                "icon": "Languages",
+                "path": "/home/instruction-language",
+                "montant": 3000.0,
+                "contenu_notif": "Votre attestation de duree de formation est prête et disponible."
+            },
         ]
         
         created_count = 0

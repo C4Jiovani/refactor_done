@@ -1,15 +1,16 @@
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, select
+from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy import and_, select, func
 from sqlalchemy.exc import IntegrityError
 from app.models import User, Document, UserRole, DocumentStatus, Categori, Niveau
 from app.schemas import (
-    UserCreate, UserUpdate, DocumentRequestCreate, DocumentRequestUpdate,
+    UserCreate, UserUpdate, DocumentRequestCreate, DocumentRequestUpdate, DocumentRequestFilter,
     NiveauCreateRequest,
-    CategoriCreateRequest,
+    CategoriCreateRequest, PaginationMeta,
 )
 from app.auth import get_password_hash
 from typing import List, Optional
 import secrets
+import math
 
 
 # CRUD pour User
@@ -139,7 +140,7 @@ def create_multiple_document_requests(db: Session, document_types: List[str], us
     db_requests = []
     for doc_type in document_types:
         # Mapper document_type vers categorie_id
-        categorie = db.query(Categori).filter(Categori.designation.ilike(f"%{doc_type}%")).first()
+        categorie = db.query(Categori).filter(Categori.slug.ilike(f"%{doc_type}%")).first()
         
         if not categorie:
             # Catégorie par défaut si non trouvée
@@ -163,7 +164,27 @@ def create_multiple_document_requests(db: Session, document_types: List[str], us
 
 def get_document_request_by_id(db: Session, request_id: int) -> Optional[Document]:
     """Récupère une demande par son ID"""
-    return db.query(Document).options(joinedload(Document.categorie), joinedload(Document.user)).filter(Document.id == request_id).first()
+    result = db.query(Document).options(
+        joinedload(Document.infosupps)
+    ).filter(Document.id == request_id).first()
+
+    # Vérifiez si les données existent
+    if result:
+        print(f"Nombre d'infosupp: {len(result.infosupps)}")
+        for info in result.infosupps:
+            print(f"Infosupp: {info.niveau}, {info.annee_univ}")
+    else :
+        print(f"Aucun info supp trouver")
+
+    result = db.query(Document).options(
+        # joinedload(Document.categorie),
+        # joinedload(Document.user),
+        # joinedload(Document.infosupps)
+        selectinload(Document.categorie),
+        selectinload(Document.user),
+        selectinload(Document.infosupps)
+    ).filter(Document.id == request_id).first()
+    return result
 
 
 def get_all_document_requests(db: Session, skip: int = 0, limit: int = 100) -> List[Document]:
@@ -174,6 +195,95 @@ def get_all_document_requests(db: Session, skip: int = 0, limit: int = 100) -> L
 def get_user_document_requests(db: Session, user_id: int) -> List[Document]:
     """Récupère toutes les demandes d'un utilisateur"""
     return db.query(Document).options(joinedload(Document.categorie)).filter(Document.user_id == user_id).all()
+
+
+def get_document_requests_filtered(
+        db: Session,
+        filters: DocumentRequestFilter,
+        current_user: User,
+) -> tuple[List[Document], PaginationMeta]:
+    # --- 1. Requête de base ---
+    # Démarre la sélection des Documents avec jointures pour éviter les requêtes N+1
+    stmt = select(Document).options(
+        selectinload(Document.categorie),
+        selectinload(Document.user),
+        selectinload(Document.infosupps)
+    )
+
+    # --- 2. Construction de la clause WHERE ---
+
+    # Filtre spécifique à l'utilisateur (obligatoire si ce n'est pas un admin)
+    if current_user.role != "admin":
+        stmt = stmt.where(Document.user_id == current_user.id)
+
+    conditions = []
+    # Filtre par statut
+    if filters.status:
+        conditions.append(Document.status == filters.status)
+    if filters.categorie_id is not None:
+        conditions.append(Document.categorie_id == filters.categorie_id)
+    if filters.start_date:
+        conditions.append(Document.date_de_demande >= filters.start_date)
+    if filters.end_date:
+        conditions.append(Document.date_de_demande <= filters.end_date)
+
+    # Filtre de Recherche Libre (Nom, Matricule, Numéro de document)
+    if filters.search_term:
+        search_like = f"%{filters.search_term}%"
+        search_condition = (
+                               User.nom.ilike(search_like)) | (
+                               User.matricule.ilike(search_like)) | (
+                               Document.numero.ilike(search_like)
+                           )
+        # Pour rechercher sur les champs utilisateur, il faut joindre la table User
+        # SQLAlchemy est suffisamment intelligent pour ne joindre qu'une seule fois.
+        stmt = stmt.join(Document.user)
+        conditions.append(search_condition)
+
+    # Application de tous les filtres à la requête
+    if conditions:
+        stmt = stmt.where(and_(*conditions))
+
+    # Ajout de la pagination et exécution
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total_items = db.execute(count_stmt).scalar_one()
+
+    # --- Application de la Pagination ---
+    per_page = filters.per_page
+    # Calcul du nombre total de pages
+    if total_items > 0:
+        page_total = math.ceil(total_items / per_page)
+    else:
+        page_total = 0
+
+    # S'assurer que la page demandée n'est pas hors limite
+    page = filters.page
+    if page > page_total and page_total > 0:
+        page = page_total  # Ramener à la dernière page
+    # Calcul de l'offset (skip)
+    skip = (page - 1) * per_page
+
+    # Création du statement final avec LIMIT et OFFSET
+    stmt_final = stmt.order_by(Document.date_de_demande.desc())
+
+    # Gérer le cas 'all=True' (Admin seulement)
+    if filters.all is False:
+        stmt_final = stmt_final.offset(skip).limit(per_page)
+
+    result = db.execute(stmt_final)
+    documents = result.scalars().all()
+
+    # Création des métadonnées de pagination
+    pagination_meta = PaginationMeta(
+        page=page,
+        page_total=page_total,
+        per_page=per_page,
+        total_items=total_items
+    )
+
+    return documents, pagination_meta
+
+
 
 
 def update_document_request(db: Session, request_id: int, request_update: DocumentRequestUpdate) -> Optional[Document]:

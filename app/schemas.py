@@ -1,7 +1,12 @@
-from pydantic import BaseModel, EmailStr, UUID4
-from datetime import datetime
+from pydantic import BaseModel, EmailStr, UUID4, Field
+from datetime import datetime, date
 from typing import Optional, List
 
+class PaginationMeta(BaseModel):
+    page: int
+    page_total: int
+    per_page: int
+    total_items: int
 
 # Schémas pour User
 class UserBase(BaseModel):
@@ -68,17 +73,80 @@ class DocumentRequestCreate(DocumentRequestBase):
     pass
 
 
-class DocumentRequestResponse(DocumentRequestBase):
-    id: int
-    user_id: UUID4
-    status: str
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-    user: Optional[UserResponse] = None
+class InfoSuppSchema(BaseModel):
+    niveau: str
+    annee_univ: str
 
     class Config:
         from_attributes = True
 
+# ==================== SCHEMAS CATEGORI (CRUD) ====================
+class CategoriResponseSchema(BaseModel):
+    id: int
+    designation : str
+    slug: Optional[str] = None
+    type: Optional[str] = None
+    icon: Optional[str] = None
+    path: Optional[str] = None
+    montant: float
+    contenu_notif: Optional[str] = None
+    is_visible: bool
+
+    class Config:
+        from_attributes = True
+
+class CategoriCreateRequest(BaseModel):
+    designation: str
+    slug: str
+    type: str
+    icon: str
+    path: str
+    montant: float
+    contenu_notif: str
+    is_visible: bool
+
+# ==================== SCHEMAS DEMANDE (CRUD) ====================
+
+# Mise à jour du Schéma de Filtre
+class DocumentRequestFilter(BaseModel):
+    """Schéma Pydantic pour les paramètres de filtrage des demandes de documents."""
+
+    # ... (Autres filtres conservés) ...
+    search_term: Optional[str] = Field(None, description="Terme de recherche libre: Nom, Matricule, ou Numéro de document.")
+    status: Optional[str] = Field(None, description="Filtrer par statut du document (ex: PENDING, APPROVED).")
+    categorie_id: Optional[int] = Field(None, description="Filtrer par ID de catégorie du document.")
+    start_date: Optional[date] = Field(None, description="Date de début pour le filtre de période (inclusif).")
+    end_date: Optional[date] = Field(None, description="Date de fin pour le filtre de période (inclusif).")
+
+    # --- Nouveaux Paramètres de Pagination ---
+    page: int = Field(1, ge=1, description="Numéro de la page à retourner (doit être >= 1).")
+    per_page: int = Field(10, ge=1, le=100, description="Nombre d'éléments par page (entre 1 et 100).")
+    all: bool = Field(False, description="Si True, ignore la pagination et retourne tous les résultats (admin seulement).")
+
+
+class DocumentRequestResponse(DocumentRequestBase):
+    id: int
+    user_id: UUID4
+    numero: Optional[str] = None
+    date_de_demande: datetime
+    date_de_validation: Optional[datetime] = None
+    pere: Optional[str] = None
+    mere: Optional[str] = None
+    status: str
+    est_paye: bool
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    user: Optional[UserResponse] = None
+    infosupps: Optional[List[InfoSuppSchema]] = None
+    categorie: Optional[CategoriResponseSchema] = None
+
+    class Config:
+        from_attributes = True
+
+class PaginatedDocumentRequestResponse(BaseModel):
+    """Schéma de réponse complet incluant les données et les informations de pagination."""
+    data: List[DocumentRequestResponse]
+    pagination: PaginationMeta
 
 class DocumentRequestUpdate(BaseModel):
     status: Optional[str] = None
@@ -109,25 +177,3 @@ class NiveauResponseSchema(BaseModel):
 class NiveauCreateRequest(BaseModel):
     designation : str
 
-
-# ==================== SCHEMAS CATEGORI (CRUD) ====================
-class CategoriResponseSchema(BaseModel):
-    id: int
-    designation : str
-    slug: Optional[str] = None
-    type: Optional[str] = None
-    icon: Optional[str] = None
-    path: Optional[str] = None
-    montant: float
-    contenu_notif: Optional[str] = None
-    is_visible: bool
-
-class CategoriCreateRequest(BaseModel):
-    designation: str
-    slug: str
-    type: str
-    icon: str
-    path: str
-    montant: float
-    contenu_notif: str
-    is_visible: bool

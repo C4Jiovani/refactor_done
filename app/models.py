@@ -123,12 +123,6 @@ class Document(Base):
     date_de_demande = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     date_de_validation = Column(DateTime(timezone=True), nullable=True)
 
-    # Clés étrangères
-    user_id = Column(UUID, ForeignKey("users.id"), nullable=True)
-    niveau_id = Column(Integer, ForeignKey("niveau.id"), nullable=True)
-    annee_univ_id = Column(String, ForeignKey("annee_univ.annee"), nullable=True)
-    categorie_id = Column(Integer, ForeignKey("categori.id"), nullable=False)
-
     # Champs spécifiques
     pere = Column(String, nullable=True)
     mere = Column(String, nullable=True)
@@ -137,6 +131,13 @@ class Document(Base):
     est_paye = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+    # Clés étrangères
+    user_id = Column(UUID, ForeignKey("users.id"), nullable=True)
+    niveau_id = Column(Integer, ForeignKey("niveau.id"), nullable=True)
+    annee_univ_id = Column(String, ForeignKey("annee_univ.annee"), nullable=True)
+    categorie_id = Column(Integer, ForeignKey("categori.id"), nullable=False)
 
     # Relations
     user = relationship("User", back_populates="documents")
