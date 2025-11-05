@@ -1,4 +1,7 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Float, Nullable, Table
+from sqlalchemy import (
+    Column, Integer, String, Boolean, DateTime,
+    ForeignKey, Float, Nullable, Table, Sequence
+)
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from sqlalchemy.orm import relationship
@@ -127,11 +130,22 @@ class Categori(Base):
         back_populates="categories"  # Doit correspondre au nom de la relation dans Document
     )
 
+# 1. Définir la séquence dans la BDD
+document_numero_seq = Sequence('document_numero_seq')
 class Document(Base):
     __tablename__ = "document"
 
     id = Column(Integer, primary_key=True, index=True)
-    numero = Column(String, unique=True, index=True, nullable=True)
+    # numero = Column(Integer, unique=True, autoincrement=True, index=True, nullable=True)
+    # Utilisation explicite de la séquence
+    numero = Column(
+        Integer,
+        document_numero_seq,  # Lier à la séquence
+        server_default=document_numero_seq.next_value(),  # Assurer la valeur par défaut
+        unique=True,
+        index=True,
+        nullable=False  # Il ne doit pas être nul s'il est auto-incrémenté
+    )
     date_de_demande = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     date_de_validation = Column(DateTime(timezone=True), nullable=True)
 

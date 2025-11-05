@@ -150,7 +150,7 @@ class DocumentRequestFilter(BaseModel):
 class DocumentRequestResponse(DocumentRequestBase):
     id: int
     user_id: UUID4
-    numero: Optional[str] = None
+    numero: Optional[int] = None
     date_de_demande: datetime
     date_de_validation: Optional[datetime] = None
     pere: Optional[str] = None

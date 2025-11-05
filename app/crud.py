@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session, joinedload, selectinload
-from sqlalchemy import and_, select, func, any_
+from sqlalchemy import and_, select, func, any_, cast, String
 from sqlalchemy.exc import IntegrityError
 from uuid import UUID
 from app.models import User, Document, UserRole, DocumentStatus, Categori, Niveau, Infosupp
@@ -189,7 +189,7 @@ def get_document_request_by_id(db: Session, request_id: int) -> Optional[Documen
         # joinedload(Document.categorie),
         # joinedload(Document.user),
         # joinedload(Document.infosupps)
-        selectinload(Document.categorie),
+        selectinload(Document.categories),
         selectinload(Document.user),
         selectinload(Document.infosupps)
     ).filter(Document.id == request_id).first()
@@ -241,10 +241,10 @@ def get_document_requests_filtered(
     if filters.search_term:
         search_like = f"%{filters.search_term}%"
         search_condition = (
-                               User.nom.ilike(search_like)) | (
-                               User.matricule.ilike(search_like)) | (
-                               Document.numero.ilike(search_like)
-                           )
+           User.nom.ilike(search_like)) | (
+           User.matricule.ilike(search_like)) | (
+           cast(Document.numero, String).ilike(search_like)
+        )
         # Pour rechercher sur les champs utilisateur, il faut joindre la table User
         # SQLAlchemy est suffisamment intelligent pour ne joindre qu'une seule fois.
         stmt = stmt.join(Document.user)
@@ -453,3 +453,6 @@ def delete_categori(db: Session, categori_id: int) -> bool:
     db.delete(db_request)
     db.commit()
     return True
+
+
+# ==================== FUNCTION NOTIFICATION (CRUD) ====================

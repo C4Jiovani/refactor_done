@@ -190,23 +190,7 @@ async def create_requests(
     )
     return db_requests
 
-
-@app.get("/requests", response_model=List[DocumentRequestResponse])
-async def read_demand_requests(
-    skip: int = 0,
-    limit: int = 100,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
-):
-    """Récupère les demandes de documents"""
-    # Si admin, retourner toutes les demandes, sinon seulement celles de l'utilisateur
-    if current_user.role == "admin":
-        requests = get_all_document_requests(db, skip=skip, limit=limit)
-    else:
-        requests = get_user_document_requests(db, user_id=current_user.id)
-    return requests
-
-@app.get("/requests/all", response_model=PaginatedDocumentRequestResponse)
+@app.get("/requests", response_model=PaginatedDocumentRequestResponse)
 async def read_demand_all_requests(
     filters: DocumentRequestFilter = Depends(),
     db: Session = Depends(get_db),
