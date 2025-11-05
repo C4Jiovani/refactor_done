@@ -175,7 +175,7 @@ async def delete_user_endpoint(
 
 # ==================== ROUTES POUR DEMANDES DE DOCUMENTS ====================
 
-@app.post("/requests", response_model=List[DocumentRequestResponse], status_code=status.HTTP_201_CREATED)
+@app.post("/requests", response_model=DocumentRequestResponse, status_code=status.HTTP_201_CREATED)
 async def create_requests(
     requests_data: DocumentCreateSchema,
     db: Session = Depends(get_db),
@@ -183,13 +183,11 @@ async def create_requests(
 ):
     # requests_data: MultipleRequestsCreate,
     """Crée une ou plusieurs demandes de documents en une seule requête"""
-
-    db_requests = create_multiple_document_requests(
+    db_requests = create_document_request(
         db=db,
-        document_types=requests_data.document_types,
+        request=requests_data,
         user_id=str(current_user.id)
     )
-    
     return db_requests
 
 

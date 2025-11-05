@@ -1,9 +1,10 @@
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import and_, select, func, any_
 from sqlalchemy.exc import IntegrityError
-from app.models import User, Document, UserRole, DocumentStatus, Categori, Niveau
+from uuid import UUID
+from app.models import User, Document, UserRole, DocumentStatus, Categori, Niveau, Infosupp
 from app.schemas import (
-    UserCreate, UserUpdate, DocumentRequestCreate, DocumentRequestUpdate, DocumentRequestFilter,
+    UserCreate, UserUpdate, DocumentRequestCreate, DocumentRequestUpdate, DocumentRequestFilter, DocumentCreateSchema,
     NiveauCreateRequest,
     CategoriCreateRequest, PaginationMeta,
 )
@@ -111,56 +112,63 @@ def delete_user(db: Session, user_id: str) -> bool:
 
 
 # CRUD pour Document (DocumentRequest est un alias)
-def create_document_request(db: Session, request: DocumentRequestCreate, user_id: int) -> Document:
+def create_document_request(db: Session, request: DocumentCreateSchema, user_id: str) -> Document:
     """Crée une nouvelle demande de document"""
-    # Mapper document_type vers categorie_id
-    # Pour l'instant, chercher une catégorie par designation
-    categorie = db.query(Categori).filter(Categori.designation.ilike(f"%{request.document_type}%")).first()
-    
-    if not categorie:
-        # Catégorie par défaut si non trouvée
-        categorie = db.query(Categori).first()
-    
-    if not categorie:
-        raise ValueError("Aucune catégorie de document trouvée")
-    
+    # 1.1 Créer l'objet Document
     db_request = Document(
-        user_id=user_id,
-        categorie_id=categorie.id,
-        status=DocumentStatus.PENDING.value,
-        est_paye=False
+        user_id=UUID(user_id),  # Assurez-vous de convertir l'ID utilisateur en UUID si nécessaire
+        pere=request.pere,
+        mere=request.mere,
+        # Les champs 'status' et 'est_paye' sont gérés par défaut/modèle
     )
     db.add(db_request)
-    db.commit()
-    db.refresh(db_request)
-    return db_request
 
+    # --- 2. Création et Association des Catégories (Relation Many-to-Many) ---
+    if request.categorie_ids:
+        # 2.1 Récupérer les objets Categori basés sur les IDs fournies
+        # Utilisation de la syntaxe select pour récupérer plusieurs objets en une seule requête
+        categories_stmt = select(Categori).where(Categori.id.in_(request.categorie_ids))
+        categories_obj = db.scalars(categories_stmt).all()
 
-def create_multiple_document_requests(db: Session, document_types: List[str], user_id: str) -> List[Document]:
-    """Crée plusieurs demandes de documents en une seule fois"""
-    db_requests = []
-    for doc_type in document_types:
-        # Mapper document_type vers categorie_id
-        categorie = db.query(Categori).filter(Categori.slug.ilike(f"%{doc_type}%")).first()
-        
-        if not categorie:
-            # Catégorie par défaut si non trouvée
-            categorie = db.query(Categori).first()
-        
-        if categorie:
-            db_request = Document(
-                user_id=str(user_id),
-                categorie_id=categorie.id,
-                status=DocumentStatus.PENDING.value,
-                est_paye=False
+        if not categories_obj or len(categories_obj) != len(request.categorie_ids):
+            # Gérer l'erreur si un ID de catégorie est invalide ou manquant
+            raise ValueError("Certains IDs de catégorie fournis sont invalides ou n'existent pas.")
+
+        # 2.2 Associer les objets Categori au Document (SQLAlchemy gère la table d'association)
+        db_request.categories.extend(categories_obj)
+
+    # categorie = db.query(Categori).filter(Categori.designation.ilike(f"%{request.document_type}%")).first()
+
+    # --- 3. Création et Association des InfoSupps (Relation One-to-Many) ---
+    if request.infosupps:
+        infosupps_to_create = []
+        for info_data in request.infosupps:
+            # Crée un objet Infosupp à partir des données Pydantic
+            # Nous n'avons pas besoin d'associer document_id ici, SQLAlchemy le fera
+            # automatiquement via la relation lors de l'ajout à la liste
+            new_infosupp = Infosupp(
+                niveau=info_data.niveau,
+                annee_univ=info_data.annee_univ
+                # L'association db_request.infosupps gère la clé étrangère
             )
-            db.add(db_request)
-            db_requests.append(db_request)
-    
-    db.commit()
-    for db_request in db_requests:
+            infosupps_to_create.append(new_infosupp)
+
+        # 3.2 Ajouter les Infosupps au document (ceci définit automatiquement document_id)
+        db_request.infosupps.extend(infosupps_to_create)
+
+    # --- 4. Exécution et Retour ---
+    try:
+        # Exécuter l'insertion du Document, des InfoSupps et des entrées d'association
+        db.commit()
+        # Rafraîchir l'objet pour obtenir l'ID généré et les relations chargées
         db.refresh(db_request)
-    return db_requests
+    except Exception as e:
+        db.rollback()
+        # Log l'erreur détaillée si possible
+        print(f"Erreur lors de la création du document et de ses relations : {e}")
+        raise e
+
+    return db_request
 
 
 def get_document_request_by_id(db: Session, request_id: int) -> Optional[Document]:

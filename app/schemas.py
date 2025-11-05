@@ -66,7 +66,7 @@ class TokenData(BaseModel):
 
 # Schémas pour Document (alias pour compatibilité)
 class DocumentRequestBase(BaseModel):
-    document_type: str
+    document_type: List[str]
 
 
 class DocumentRequestCreate(DocumentRequestBase):
