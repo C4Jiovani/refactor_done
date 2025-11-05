@@ -119,23 +119,24 @@ def create_document_request(db: Session, request: DocumentCreateSchema, user_id:
         user_id=UUID(user_id),  # Assurez-vous de convertir l'ID utilisateur en UUID si nécessaire
         pere=request.pere,
         mere=request.mere,
+        categorie_id=request.categorie_id
         # Les champs 'status' et 'est_paye' sont gérés par défaut/modèle
     )
     db.add(db_request)
 
-    # --- 2. Création et Association des Catégories (Relation Many-to-Many) ---
-    if request.categorie_ids:
-        # 2.1 Récupérer les objets Categori basés sur les IDs fournies
-        # Utilisation de la syntaxe select pour récupérer plusieurs objets en une seule requête
-        categories_stmt = select(Categori).where(Categori.id.in_(request.categorie_ids))
-        categories_obj = db.scalars(categories_stmt).all()
-
-        if not categories_obj or len(categories_obj) != len(request.categorie_ids):
-            # Gérer l'erreur si un ID de catégorie est invalide ou manquant
-            raise ValueError("Certains IDs de catégorie fournis sont invalides ou n'existent pas.")
-
-        # 2.2 Associer les objets Categori au Document (SQLAlchemy gère la table d'association)
-        db_request.categories.extend(categories_obj)
+    # # --- 2. Création et Association des Catégories (Relation Many-to-Many) ---
+    # if request.categorie_ids:
+    #     # 2.1 Récupérer les objets Categori basés sur les IDs fournies
+    #     # Utilisation de la syntaxe select pour récupérer plusieurs objets en une seule requête
+    #     categories_stmt = select(Categori).where(Categori.id.in_(request.categorie_ids))
+    #     categories_obj = db.scalars(categories_stmt).all()
+    #
+    #     if not categories_obj or len(categories_obj) != len(request.categorie_ids):
+    #         # Gérer l'erreur si un ID de catégorie est invalide ou manquant
+    #         raise ValueError("Certains IDs de catégorie fournis sont invalides ou n'existent pas.")
+    #
+    #     # 2.2 Associer les objets Categori au Document (SQLAlchemy gère la table d'association)
+    #     db_request.categories.extend(categories_obj)
 
     # categorie = db.query(Categori).filter(Categori.designation.ilike(f"%{request.document_type}%")).first()
 
@@ -174,7 +175,7 @@ def create_document_request(db: Session, request: DocumentCreateSchema, user_id:
 def get_document_request_by_id(db: Session, request_id: int) -> Optional[Document]:
     """Récupère une demande par son ID"""
     result = db.query(Document).options(
-        joinedload(Document.infosupps)
+        selectinload(Document.infosupps)
     ).filter(Document.id == request_id).first()
 
     # Vérifiez si les données existent
@@ -189,10 +190,11 @@ def get_document_request_by_id(db: Session, request_id: int) -> Optional[Documen
         # joinedload(Document.categorie),
         # joinedload(Document.user),
         # joinedload(Document.infosupps)
-        selectinload(Document.categories),
+        selectinload(Document.categorie),
         selectinload(Document.user),
         selectinload(Document.infosupps)
     ).filter(Document.id == request_id).first()
+
     return result
 
 
@@ -214,7 +216,7 @@ def get_document_requests_filtered(
     # --- 1. Requête de base ---
     # Démarre la sélection des Documents avec jointures pour éviter les requêtes N+1
     stmt = select(Document).options(
-        selectinload(Document.categories),
+        selectinload(Document.categorie),
         selectinload(Document.user),
         selectinload(Document.infosupps)
     )
@@ -230,8 +232,8 @@ def get_document_requests_filtered(
     if filters.status:
         conditions.append(Document.status == filters.status)
     if filters.categorie_id is not None:
-        # conditions.append(Document.categorie_id == filters.categorie_id)
-        conditions.append(Document.categories.any(Categori.id.in_(filters.categorie_id)))
+        conditions.append(Document.categorie_id == filters.categorie_id)
+        # conditions.append(Document.categories.any(Categori.id.in_(filters.categorie_id)))
     if filters.start_date:
         conditions.append(Document.date_de_demande >= filters.start_date)
     if filters.end_date:
@@ -298,7 +300,7 @@ def get_document_requests_filtered(
 
 def update_document_request(db: Session, request_id: int, request_update: DocumentRequestUpdate) -> Optional[Document]:
     """Met à jour une demande"""
-    db_request = db.query(Document).options(joinedload(Document.categories), joinedload(Document.user)).filter(Document.id == request_id).first()
+    db_request = db.query(Document).options(joinedload(Document.categorie), joinedload(Document.user)).filter(Document.id == request_id).first()
     if not db_request:
         return None
     

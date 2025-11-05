@@ -121,14 +121,16 @@ class Categori(Base):
     montant = Column(Float, nullable=False)
     contenu_notif = Column(String, nullable=True)
     is_visible = Column(Boolean, default=True)
+    with_parent = Column(Boolean, default=False)
+    with_info = Column(Boolean, default=False)
 
-    # Relations
-    # documents = relationship("Document", back_populates="categorie")
-    documents = relationship(
-        "Document",
-        secondary=document_categorie_association,  # Utilisation de la table d'association
-        back_populates="categories"  # Doit correspondre au nom de la relation dans Document
-    )
+    # RelationsTrue
+    documents = relationship("Document", back_populates="categorie")
+    # documents = relationship(
+    #     "Document",
+    #     secondary=document_categorie_association,  # Utilisation de la table d'association
+    #     back_populates="categories"  # Doit correspondre au nom de la relation dans Document
+    # )
 
 # 1. Définir la séquence dans la BDD
 document_numero_seq = Sequence('document_numero_seq')
@@ -163,26 +165,26 @@ class Document(Base):
     user_id = Column(UUID, ForeignKey("users.id"), nullable=True)
     niveau_id = Column(Integer, ForeignKey("niveau.id"), nullable=True)
     annee_univ_id = Column(String, ForeignKey("annee_univ.annee"), nullable=True)
-    # categorie_id = Column(Integer, ForeignKey("categori.id"), nullable=False)
+    categorie_id = Column(Integer, ForeignKey("categori.id"), nullable=False)
 
     # Relations
     user = relationship("User", back_populates="documents")
     niveau = relationship("Niveau", back_populates="documents")
     annee_univ = relationship("AnneeUniv", back_populates="documents", foreign_keys=[annee_univ_id])
-    # categorie = relationship("Categori", back_populates="documents")
-    categories = relationship(
-        "Categori",
-        secondary=document_categorie_association,  # Utilisation de la table d'association
-        back_populates="documents"
-    )
+    categorie = relationship("Categori", back_populates="documents")
+    # categories = relationship(
+    #     "Categori",
+    #     secondary=document_categorie_association,  # Utilisation de la table d'association
+    #     back_populates="documents"
+    # )
     notifications = relationship("Notification", back_populates="document")
     infosupps = relationship("Infosupp", back_populates="document")
 
     @hybrid_property
     def document_type(self):
         """Retourne le type de document (designation de la catégorie)"""
-        # return self.categorie.designation if self.categorie else ""
-        return [c.designation for c in self.categories] if self.categories else []
+        return self.categorie.designation if self.categorie else ""
+        # return [c.designation for c in self.categories] if self.categories else []
 
 class Infosupp(Base):
     __tablename__ = "infosupp"

@@ -66,7 +66,8 @@ class TokenData(BaseModel):
 
 # Schémas pour Document (alias pour compatibilité)
 class DocumentRequestBase(BaseModel):
-    document_type: List[str]
+    # document_type: List[str]
+    document_type: str
 
 
 class DocumentRequestCreate(DocumentRequestBase):
@@ -91,6 +92,8 @@ class CategoriResponseSchema(BaseModel):
     montant: float
     contenu_notif: Optional[str] = None
     is_visible: bool
+    with_parent: bool
+    with_info: bool
 
     class Config:
         from_attributes = True
@@ -104,16 +107,15 @@ class CategoriCreateRequest(BaseModel):
     montant: float
     contenu_notif: str
     is_visible: bool
+    with_parent: Optional[bool] = None
+    with_info: Optional[bool] = None
 
 # ==================== SCHEMAS DEMANDE (CRUD) ====================
 class DocumentCreateSchema(BaseModel):
     """Schéma Pydantic pour la création d'une seule demande de document."""
     pere: Optional[str] = None
     mere: Optional[str] = None
-    categorie_ids: List[int] = Field(
-        ...,
-        description="Liste des IDs des catégories à associer au document."
-    )
+    categorie_id: int
     infosupps: Optional[List[InfoSuppSchema]] = None  # Pour la création des InfoSupps
 
     # user_id: UUID4
@@ -137,7 +139,7 @@ class DocumentRequestFilter(BaseModel):
 
     search_term: Optional[str] = Field(None, description="Terme de recherche libre: Nom, Matricule, ou Numéro de document.")
     status: Optional[str] = Field(None, description="Filtrer par statut du document (ex: PENDING, APPROVED).")
-    categorie_id: Optional[List[int]] = Field(None, description="Filtrer par ID de catégorie du document.")
+    categorie_id: Optional[int] = Field(None, description="Filtrer par ID de catégorie du document.")
     start_date: Optional[date] = Field(None, description="Date de début pour le filtre de période (inclusif).")
     end_date: Optional[date] = Field(None, description="Date de fin pour le filtre de période (inclusif).")
 
@@ -161,7 +163,7 @@ class DocumentRequestResponse(DocumentRequestBase):
     updated_at: Optional[datetime] = None
     user: Optional[UserResponse] = None
     infosupps: Optional[List[InfoSuppSchema]] = None
-    categories: Optional[List[CategoriResponseSchema]] = None
+    categorie: Optional[CategoriResponseSchema] = None
 
     class Config:
         from_attributes = True
@@ -178,7 +180,8 @@ class DocumentRequestUpdate(BaseModel):
 
 # Schéma pour créer plusieurs demandes en une fois
 class MultipleRequestsCreate(BaseModel):
-    document_types: List[str]
+    # document_types: List[str]
+    document_type: str
 
 
 # Alias pour compatibilité avec le modèle Document
