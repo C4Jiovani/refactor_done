@@ -423,6 +423,32 @@ def notification_unseen_requests(
     rows_updated = mark_as_seen(db, data.notif_ids, current_user.id)
     return {"message": f"{rows_updated} notification(s) marquée(s) comme lue(s)."}
 
+@app.put("/notification", status_code=HTTP_200_OK)
+def notification_unseen_requests(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_sco_or_admin_user)
+):
+    rows_updated = mark_as_seen(db, data.notif_ids, current_user.id)
+    return {"message": f"{rows_updated} notification(s) marquée(s) comme lue(s)."}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 @app.get("/send", status_code=HTTP_200_OK)
 async def test_realtime():

@@ -258,5 +258,18 @@ class EmailSchema(BaseModel):
 # ==================== REALTIME CONTENT (CRUD) ====================
 class AblyMessage(BaseModel):
     channel: str
-    publisher: dict
+    publisher: str
     content: NotificationResponseSchema | DocumentResponse
+
+    def to_payload(self):
+        if isinstance(self.content, BaseModel):
+            return self.content.model_dump()
+        elif isinstance(self.content, dict):
+            return self.content
+        elif isinstance(self.content, str):
+            return {"message": self.content}
+        else:
+            return {"message": str(self.content)}
+
+class DashboardStatsResponse(BaseModel):
+    pass

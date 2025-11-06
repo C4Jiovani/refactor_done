@@ -1,6 +1,6 @@
 from fastapi import BackgroundTasks
 from sqlalchemy.orm import Session, joinedload, selectinload
-from sqlalchemy import and_, select, func, any_, cast, String, update
+from sqlalchemy import and_, select, func, any_, cast, String, update, extract
 from sqlalchemy.exc import IntegrityError
 from uuid import UUID
 from app.models import User, Document, UserRole, DocumentStatus, Categori, Niveau, Infosupp, Notification, TypeNotif
@@ -838,3 +838,66 @@ def mark_as_seen(db: Session, notif_ids: List[int], user_uuid: UUID):
         db.rollback()
         print(f"Erreur lors de la mise à jour des notifications comme vues : {e}")
         raise e
+
+async def get_all_stats_for_dashboard(db:Session):
+    current_month = datetime.now().month
+    current_year = datetime.now().year
+
+    # === 1️⃣ Indicateurs généraux ===
+    total_docs = db.query(func.count(Document.id)).scalar()
+    total_pending = db.query(func.count()).filter(Document.status == DocumentStatus.PENDING).scalar()
+    total_validated = db.query(func.count()).filter(Document.status == DocumentStatus.VALIDATE).scalar()
+    total_refused = db.query(func.count()).filter(Document.status == DocumentStatus.REFUSE).scalar()
+    total_paid = db.query(func.count()).filter(Document.est_paye == True).scalar()
+
+    total_students = db.query(func.count()).filter(User.type == "etudiant").scalar()
+    total_students_pending = (db.query(func.count(User.id))
+          .filter(User.type == "etudiant", User.is_active == False).scalar())
+
+    # Montant total encaissé
+    total_revenue = (
+        db.query(func.sum(Categori.montant))
+        .join(Document, Document.categorie_id == Categori.id)
+        .filter(Document.est_paye == True)
+        .scalar()
+    ) or 0.0
+
+    # === 2️⃣ Statistiques temporelles ===
+    dmd_this_month = (
+        db.query(func.count(Document.id))
+        .filter(extract("month", Document.date_de_demande) == current_month)
+        .scalar()
+    )
+    validated_this_month = (
+        db.query(func.count(Document.id))
+        .filter(
+            Document.status == DocumentStatus.VALIDATE,
+            extract("month", Document.date_de_validation) == current_month
+        )
+        .scalar()
+    )
+
+    # === 3️⃣ Répartition par catégorie ===
+    docs_by_category = (
+        db.query(Categori.designation, func.count(Document.id))
+        .join(Document, Document.categorie_id == Categori.id)
+        .group_by(Categori.designation)
+        .all()
+    )
+
+    # === 4️⃣ Répartition par niveau ===
+    docs_by_level = (
+        db.query(Niveau.designation, func.count(Document.id))
+        .join(Document, Document.niveau_id == Niveau.id)
+        .group_by(Niveau.designation)
+        .all()
+    )
+
+
+
+
+
+
+
+
+
