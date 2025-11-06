@@ -353,7 +353,7 @@ async def create_document_request(
         raise e
 
     # --- 5. Création des Notifications (Après le Commit) ---
-    notif_content = f"Nouvelle demande de document à examiner (ID: {db_request.numero}, Categori : {db_request.categorie.designation})."
+    notif_content = f"Nouvelle demande de document à examiner N°: {db_request.numero}, Categori : {db_request.categorie.designation})."
 
     # Créer une notification pour tous les utilisateurs sauf "student"
     create_notifications_for_roles(
