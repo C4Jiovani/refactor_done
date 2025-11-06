@@ -22,6 +22,7 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+    niveau_id: int
 
 
 class UserResponse(UserBase):
@@ -159,6 +160,7 @@ class DocumentRequestResponse(DocumentRequestBase):
     mere: Optional[str] = None
     status: str
     est_paye: bool
+    is_deleted: bool
     created_at: datetime
     updated_at: Optional[datetime] = None
     user: Optional[UserResponse] = None
@@ -176,6 +178,12 @@ class PaginatedDocumentRequestResponse(BaseModel):
 class DocumentRequestUpdate(BaseModel):
     status: Optional[str] = None # pending, validate, refused
     est_paye: Optional[bool] = None
+
+
+class DocumentRequestCLientUpdate(BaseModel):
+    pere: Optional[str] = None # pending, validate, refused
+    mere: Optional[bool] = None
+    infosupps: Optional[List[InfoSuppSchema]] = None
 
 
 # Schéma pour créer plusieurs demandes en une fois
@@ -204,3 +212,15 @@ class NiveauResponseSchema(BaseModel):
 class NiveauCreateRequest(BaseModel):
     designation : str
 
+
+# ==================== SCHEMAS NOTIFICATION (CRUD) ====================
+class NotificationResponseSchema(BaseModel):
+    id: int
+    user: Optional[UserResponse] = None
+    document: Optional[DocumentRequestResponse] = None
+    contenu: Optional[str] = None
+    type_notif: str
+    vue: Optional[bool] = None
+
+class NotificationSeenSchema(BaseModel):
+    notif_ids: List[int]

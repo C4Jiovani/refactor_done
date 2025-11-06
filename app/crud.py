@@ -1,18 +1,120 @@
 from sqlalchemy.orm import Session, joinedload, selectinload
-from sqlalchemy import and_, select, func, any_, cast, String
+from sqlalchemy import and_, select, func, any_, cast, String, update
 from sqlalchemy.exc import IntegrityError
 from uuid import UUID
-from app.models import User, Document, UserRole, DocumentStatus, Categori, Niveau, Infosupp
+from app.models import User, Document, UserRole, DocumentStatus, Categori, Niveau, Infosupp, Notification, TypeNotif
 from app.schemas import (
-    UserCreate, UserUpdate, DocumentRequestCreate, DocumentRequestUpdate, DocumentRequestFilter, DocumentCreateSchema,
+    UserCreate, UserUpdate, DocumentRequestCreate, DocumentRequestUpdate, DocumentRequestFilter,
+    DocumentCreateSchema, DocumentRequestCLientUpdate,
     NiveauCreateRequest,
     CategoriCreateRequest, PaginationMeta,
+    NotificationSeenSchema,
 )
 from app.auth import get_password_hash
 from typing import List, Optional
 import secrets
 import math
 from datetime import datetime
+
+
+# --- FONCTION UTILITAIRE DE NOTIFICATION ---
+def create_notifications_for_roles(
+        db: Session,
+        document: Document,
+        notif_type: TypeNotif,
+        content: str,
+        excluded_role: Optional[str] = "etudiant",
+        specific_user_id: Optional[str] = None,
+) -> List[Notification]:
+    """
+    Crée une notification pour tous les utilisateurs n'ayant pas le rôle spécifié.
+    Utilisé ici pour les notifications de type REQUEST.
+    """
+
+    # 1. Trouver les IDs des utilisateurs ciblés (tous sauf les étudiants)
+    target_users_stmt = select(User.id).where(User.type != excluded_role)
+    target_user_ids = db.scalars(target_users_stmt).all()
+
+    if not target_user_ids:
+        print("Aucun utilisateur cible trouvé pour recevoir la notification.")
+        return []
+
+    # 2. Créer les objets Notification
+    new_notifications = []
+    for user_id in target_user_ids:
+        new_notif = Notification(
+            user_id=user_id,
+            document_id=document.id,
+            contenu=content,
+            type_notif=notif_type.value,
+            vue=False
+        )
+        new_notifications.append(new_notif)
+        db.add(new_notif)
+        db.commit()
+
+    return new_notifications
+
+def create_notifications_for_user(
+        db: Session,
+        document: Document,
+        notif_type: TypeNotif,
+        # content: str,
+) -> List[Notification]:
+    """
+    Crée une notification pour tous les utilisateurs n'ayant pas le rôle spécifié.
+    Utilisé ici pour les notifications de type REQUEST.
+    """
+
+    new_notif = Notification(
+        user_id=document.user_id,
+        document_id=document.id,
+        contenu=document.categorie.contenu_notif,
+        type_notif=notif_type.value,
+        vue=False
+    )
+
+    db.add(new_notif)
+    db.commit()
+    db.refresh(new_notif)
+
+    return new_notif
+
+def create_notifications_for_register(
+        db: Session,
+        new_user_id: User,
+        notif_type: TypeNotif,
+) -> List[Notification]:
+    """
+    Crée une notification pour tous les utilisateurs n'ayant pas le rôle spécifié.
+    Utilisé ici pour les notifications de type REQUEST.
+    """
+
+    # 1. Trouver les IDs des utilisateurs ciblés (tous sauf les étudiants)
+    target_users_stmt = select(User.id).where(User.type == "admin")
+    target_user_ids = db.scalars(target_users_stmt).all()
+
+    if not target_user_ids:
+        print("Aucun utilisateur cible trouvé pour recevoir la notification.")
+        return []
+
+    # 2. Créer les objets Notification
+    new_notifications = []
+    for user_id in target_user_ids:
+        new_notif = Notification(
+            user_id=user_id,
+            contenu= f"Nouvelle inscription en attente de validation. Un nouvel utilisateur est en attente d'approbation administrative. "
+                     f"\n Etudiant: {new_user_id.full_name}",
+            type_notif=notif_type.value,
+            vue=False
+        )
+        new_notifications.append(new_notif)
+        db.add(new_notif)
+        db.commit()
+
+    return new_notifications
+
+
 
 
 # CRUD pour User
@@ -48,6 +150,8 @@ def create_user(db: Session, user: UserCreate) -> User:
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+
+    create_notifications_for_register(db, db_user, TypeNotif.REGISTER)
     return db_user
 
 
@@ -111,6 +215,7 @@ def delete_user(db: Session, user_id: str) -> bool:
     return True
 
 
+
 # CRUD pour Document (DocumentRequest est un alias)
 def create_document_request(db: Session, request: DocumentCreateSchema, user_id: str) -> Document:
     """Crée une nouvelle demande de document"""
@@ -124,23 +229,6 @@ def create_document_request(db: Session, request: DocumentCreateSchema, user_id:
     )
     db.add(db_request)
 
-    # # --- 2. Création et Association des Catégories (Relation Many-to-Many) ---
-    # if request.categorie_ids:
-    #     # 2.1 Récupérer les objets Categori basés sur les IDs fournies
-    #     # Utilisation de la syntaxe select pour récupérer plusieurs objets en une seule requête
-    #     categories_stmt = select(Categori).where(Categori.id.in_(request.categorie_ids))
-    #     categories_obj = db.scalars(categories_stmt).all()
-    #
-    #     if not categories_obj or len(categories_obj) != len(request.categorie_ids):
-    #         # Gérer l'erreur si un ID de catégorie est invalide ou manquant
-    #         raise ValueError("Certains IDs de catégorie fournis sont invalides ou n'existent pas.")
-    #
-    #     # 2.2 Associer les objets Categori au Document (SQLAlchemy gère la table d'association)
-    #     db_request.categories.extend(categories_obj)
-
-    # categorie = db.query(Categori).filter(Categori.designation.ilike(f"%{request.document_type}%")).first()
-
-    # --- 3. Création et Association des InfoSupps (Relation One-to-Many) ---
     if request.infosupps:
         infosupps_to_create = []
         for info_data in request.infosupps:
@@ -167,6 +255,69 @@ def create_document_request(db: Session, request: DocumentCreateSchema, user_id:
         db.rollback()
         # Log l'erreur détaillée si possible
         print(f"Erreur lors de la création du document et de ses relations : {e}")
+        raise e
+
+    # --- 5. Création des Notifications (Après le Commit) ---
+    notif_content = f"Nouvelle demande de document à examiner (ID: {db_request.numero}, Categori : {db_request.categorie.designation})."
+
+    # Créer une notification pour tous les utilisateurs sauf "student"
+    create_notifications_for_roles(
+        db=db,
+        document=db_request,
+        notif_type=TypeNotif.REQUEST,
+        content=notif_content,
+        excluded_role="etudiant"
+    )
+
+    # Il est crucial de faire un second commit pour les notifications.
+    # On pourrait aussi envelopper tout dans une seule transaction,
+    # mais un commit séparé est acceptable si le système de notification est secondaire.
+    try:
+        db.commit()
+        # pass
+    except Exception as e:
+        # La création du document a réussi, mais la notification a échoué.
+        # On pourrait logguer ceci sans faire un rollback du document.
+        print(f"Erreur lors du commit des notifications : {e}")
+        db.rollback()
+
+    return db_request
+
+# CRUD pour Document (DocumentRequest est un alias)
+def update_document_client_request(db: Session, request: DocumentRequestCLientUpdate, document_id: int) -> Document:
+    """Crée une nouvelle demande de document"""
+    # 1.1 Recuperer le document en question
+    db_request = db.get(Document, document_id)
+    if not db_request:
+        raise ValueError(f"Document with ID {document_id} not found.")
+
+    if request.pere is not None :
+        db_request.pere = request.pere
+    if db_request.mere is not None:
+        db_request.pere = request.mere
+    print(db_request.categorie.with_info)
+
+    if request.infosupps is not None and db_request.categorie.with_info:
+        for info in db_request.infosupps:
+            db.delete(info)
+        db_request.infosupps = [] # Puis réinitialiser la collection
+
+        new_infosupps = []
+        for info_data in request.infosupps:
+            new_infosupp = Infosupp(
+                niveau=info_data.niveau,
+                annee_univ=info_data.annee_univ
+            )
+            new_infosupps.append(new_infosupp)
+
+        db_request.infosupps.extend(new_infosupps)
+    try:
+        # Un seul commit est nécessaire pour tout enregistrer (Document, suppressions, ajouts)
+        db.commit()
+        db.refresh(db_request)
+    except Exception as e:
+        db.rollback()
+        print(f"Erreur lors de la mise à jour du document : {e}")
         raise e
 
     return db_request
@@ -325,9 +476,23 @@ def update_document_request(db: Session, request_id: int, request_update: Docume
     # Si le statut passe à validé, mettre à jour date_de_validation
     if update_data.get('status') == DocumentStatus.VALIDATE.value:
         db_request.date_de_validation = datetime.now()
-    
-    db.commit()
-    db.refresh(db_request)
+
+
+        # --- 5. Création des Notifications (Après le Commit) ---
+        # notif_content = f"Nouvelle demande de document à examiner (ID: {db_request.numero}, Categori : {db_request.categorie.designation})."
+        create_notifications_for_user(
+            db=db,
+            document=db_request,
+            notif_type=TypeNotif.VALIDATION,
+        )
+
+    try:
+        db.commit()
+        db.refresh(db_request)
+    except Exception as e:
+        print(f"Erreur lors du commit des notifications : {e}")
+        db.rollback()
+
     return db_request
 
 
@@ -336,8 +501,12 @@ def delete_document_request(db: Session, request_id: int) -> bool:
     db_request = db.query(Document).filter(Document.id == request_id).first()
     if not db_request:
         return False
-    db.delete(db_request)
+
+    db_request.is_deleted = True
+    # db.delete(db_request)
+    # db.commit()
     db.commit()
+    db.refresh(db_request)
     return True
 
 
@@ -458,3 +627,35 @@ def delete_categori(db: Session, categori_id: int) -> bool:
 
 
 # ==================== FUNCTION NOTIFICATION (CRUD) ====================
+def get_notification_for_active_user(db: Session, user_id) -> List[Notification]:
+    stmt = select(Notification).where(
+        Notification.user_id == user_id
+    ).order_by(
+        Notification.date_de_notification.desc()
+    )
+    result = db.execute(stmt).scalars().all()
+    return result
+
+def mark_as_seen(db: Session, notif_ids: List[int], user_uuid: UUID):
+    if not notif_ids:
+        return 0
+
+    try:
+        # On utilise 'update()' avec DEUX conditions dans le where :
+        stmt = update(Notification).where(
+            Notification.id.in_(notif_ids),
+            # Condition de sécurité essentielle : la notification doit appartenir à l'utilisateur
+            Notification.user_id == user_uuid
+        ).values(
+            vue=True
+        )
+
+        result = db.execute(stmt)
+        db.commit()
+
+        return result.rowcount
+
+    except Exception as e:
+        db.rollback()
+        print(f"Erreur lors de la mise à jour des notifications comme vues : {e}")
+        raise e

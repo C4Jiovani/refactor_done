@@ -44,7 +44,7 @@ def init_db():
             {
                 "designation": "Relevé de notes",
                 "slug": "releve_note",
-                "type": None,
+                "type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": None,
                 "icon": "FileCheck",
                 "path": "/home/academic-transcript",
                 "montant": 2000.0,

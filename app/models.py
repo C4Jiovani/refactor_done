@@ -157,6 +157,7 @@ class Document(Base):
 
     status = Column(String, default=DocumentStatus.PENDING.value, nullable=False)
     est_paye = Column(Boolean, default=False, nullable=False)
+    is_deleted = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -197,6 +198,12 @@ class Infosupp(Base):
     document_id = Column(Integer, ForeignKey("document.id"), nullable=True)
     document = relationship("Document", back_populates="infosupps")
 
+
+class TypeNotif(str, enum.Enum):
+    REQUEST = "request"
+    REGISTER = "register"
+    VALIDATION = "validation"
+
 class Notification(Base):
     __tablename__ = "notification"
 
@@ -204,9 +211,9 @@ class Notification(Base):
     user_id = Column(UUID, ForeignKey("users.id"), nullable=False)
     document_id = Column(Integer, ForeignKey("document.id"), nullable=True)
     date_de_notification = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    vue = Column(Boolean, default=False, nullable=False)
     contenu = Column(String, nullable=False)
-    type_notif = Column(String, nullable=True)
+    type_notif = Column(String, default=TypeNotif.REQUEST.value, nullable=True) #request, register, validation
+    vue = Column(Boolean, default=False, nullable=False)
 
     # Relations
     user = relationship("User", back_populates="notifications")

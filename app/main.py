@@ -8,14 +8,15 @@ from typing import List
 from starlette.status import HTTP_201_CREATED, HTTP_200_OK
 
 from app.database import get_db, engine, Base
-from app.models import User, Document, Niveau
+from app.models import User, Document, Niveau, Notification
 from app.schemas import (
     UserCreate, UserResponse, UserUpdate, Token, LoginRequest,
-    DocumentRequestCreate, DocumentRequestResponse, DocumentRequestUpdate,
+    DocumentRequestCreate, DocumentRequestResponse, DocumentRequestUpdate, DocumentRequestCLientUpdate,
     DocumentRequestFilter, PaginatedDocumentRequestResponse, DocumentCreateSchema,
     MultipleRequestsCreate, NotificationMessage,
     NiveauResponseSchema, NiveauCreateRequest,
     CategoriCreateRequest, CategoriResponseSchema,
+    NotificationResponseSchema, NotificationSeenSchema,
 )
 from app.auth import (
     authenticate_user, create_access_token, get_current_active_user,
@@ -26,9 +27,10 @@ from app.crud import (
     get_pending_users, update_user, delete_user,
     create_document_request,
     get_document_request_by_id, get_all_document_requests, get_document_requests_filtered,
-    get_user_document_requests, update_document_request, delete_document_request,
+    get_user_document_requests, update_document_request, update_document_client_request, delete_document_request,
     get_all_niveau, create_niveau, update_niveau, delete_niveau, get_a_niveau,
-    get_a_categori, get_all_categori, create_categori, update_categori, delete_categori
+    get_a_categori, get_all_categori, create_categori, update_categori, delete_categori,
+    get_notification_for_active_user, mark_as_seen
 )
 from app.services.websocket_manager import manager
 
@@ -175,21 +177,6 @@ async def delete_user_endpoint(
 
 # ==================== ROUTES POUR DEMANDES DE DOCUMENTS ====================
 
-@app.post("/requests", response_model=DocumentRequestResponse, status_code=status.HTTP_201_CREATED)
-async def create_requests(
-    requests_data: DocumentCreateSchema,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
-):
-    # requests_data: MultipleRequestsCreate,
-    """Crée une ou plusieurs demandes de documents en une seule requête"""
-    db_requests = create_document_request(
-        db=db,
-        request=requests_data,
-        user_id=str(current_user.id)
-    )
-    return db_requests
-
 @app.get("/requests", response_model=PaginatedDocumentRequestResponse)
 async def read_demand_all_requests(
     filters: DocumentRequestFilter = Depends(),
@@ -232,6 +219,22 @@ async def read_single_demand_request(
     return db_request
 
 
+@app.post("/requests", response_model=DocumentRequestResponse, status_code=status.HTTP_201_CREATED)
+async def create_requests(
+    requests_data: DocumentCreateSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    # requests_data: MultipleRequestsCreate,
+    """Crée une ou plusieurs demandes de documents en une seule requête"""
+    db_requests = create_document_request(
+        db=db,
+        request=requests_data,
+        user_id=str(current_user.id)
+    )
+    return db_requests
+
+
 @app.put("/requests/{request_id}", response_model=DocumentRequestResponse)
 async def update_request(
     request_id: int,
@@ -246,7 +249,7 @@ async def update_request(
 
     old_status = db_request.status
     updated_request = update_document_request(db, request_id=request_id, request_update=request_update)
-    
+
     # Envoyer une notification si le statut a changé
     if request_update.status and request_update.status != old_status:
         notification_message = {
@@ -262,6 +265,22 @@ async def update_request(
         }
         await manager.send_personal_message(notification_message, updated_request.user_id)
     return updated_request
+
+
+@app.put("/requests/for_student/{request_id}", response_model=DocumentRequestResponse)
+async def update_for_client_request(
+    request_id: int,
+    request_update: DocumentRequestCLientUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Met à jour le statut d'une demande (admin seulement)"""
+    db_requests = update_document_client_request(
+        db=db,
+        request=request_update,
+        document_id=request_id
+    )
+    return db_requests
 
 
 @app.delete("/requests/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -375,6 +394,30 @@ async def delete_categori_request(
     success = delete_categori(db, categori_id)
     if not success:
         raise HTTPException(status_code=404, detail="Categori not found")
+
+
+# ==================== ROUTES NOTIFICATION =====================
+@app.get("/notification", response_model=List[NotificationResponseSchema])
+def notification_requests(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    result = get_notification_for_active_user(db, current_user.id)
+    return result
+
+@app.put("/notification", status_code=HTTP_200_OK)
+def notification_unseen_requests(
+    data: NotificationSeenSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    rows_updated = mark_as_seen(db, data.notif_ids, current_user.id)
+    return {"message": f"{rows_updated} notification(s) marquée(s) comme lue(s)."}
+
+
+
+
+
 
 
 
