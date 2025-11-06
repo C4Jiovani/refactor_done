@@ -187,7 +187,7 @@ async def delete_user_endpoint(
 async def read_demand_all_requests(
     filters: DocumentRequestFilter = Depends(),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_sco_or_admin_user)
+    current_user: User = Depends(get_current_active_user())
 ):
     """
     Récupère les demandes de documents avec support de pagination et de filtres.
