@@ -81,6 +81,23 @@ def get_current_active_user(current_user: User = Depends(get_current_user)) -> U
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
+def get_current_sco_user(current_user: User = Depends(get_current_active_user)) -> User:
+    """Vérifie que l'utilisateur actuel est un personnel de la scolarite"""
+    if current_user.type != "sco":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions"
+        )
+    return current_user
+
+def get_current_sco_or_admin_user(current_user: User = Depends(get_current_active_user)) -> User:
+    """Vérifie que l'utilisateur actuel est un personnel de la scolarite"""
+    if current_user.type not in ["sco", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions"
+        )
+    return current_user
 
 def get_current_admin_user(current_user: User = Depends(get_current_active_user)) -> User:
     """Vérifie que l'utilisateur actuel est un administrateur"""

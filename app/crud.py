@@ -1,3 +1,4 @@
+from fastapi import BackgroundTasks
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import and_, select, func, any_, cast, String, update
 from sqlalchemy.exc import IntegrityError
@@ -8,8 +9,10 @@ from app.schemas import (
     DocumentCreateSchema, DocumentRequestCLientUpdate,
     NiveauCreateRequest,
     CategoriCreateRequest, PaginationMeta,
-    NotificationSeenSchema,
+    NotificationSeenSchema, EmailSchema, UserRequestFilter
 )
+from .services.mail_service import send_email_async
+
 from app.auth import get_password_hash
 from typing import List, Optional
 import secrets
@@ -18,6 +21,22 @@ from datetime import datetime
 
 
 # --- FONCTION UTILITAIRE DE NOTIFICATION ---
+def get_admin_emails(db:Session) -> List[str]:
+    target_users_stmt = select(User.email).where(User.type == "admin")
+    target_user_emails = db.scalars(target_users_stmt).all()
+
+    if not target_user_emails:
+        print("Aucun utilisateur cible trouvé pour recevoir la notification par email.")
+        return []
+
+    # 2. Créer les objets Notification
+    admin_emails = []
+    for admin in target_user_emails:
+        admin_emails.append(admin)
+
+    return admin_emails
+
+
 def create_notifications_for_roles(
         db: Session,
         document: Document,
@@ -118,12 +137,12 @@ def create_notifications_for_register(
 
 
 # CRUD pour User
-def create_user(db: Session, user: UserCreate) -> User:
+async def create_user(db: Session, user: UserCreate, background_task: BackgroundTasks) -> User:
     """Crée un nouvel utilisateur (non actif par défaut)"""
     hashed_password = get_password_hash(user.password)
     
     # Gérer matricule si non fourni
-    matricule = user.matricule if user.matricule else f"STU{secrets.token_hex(4).upper()}"
+    # matricule = user.matricule if user.matricule else f"STU{secrets.token_hex(4).upper()}"
     
     # Gérer nom et prénom
     if user.full_name and not (user.nom and user.prenom):
@@ -136,12 +155,13 @@ def create_user(db: Session, user: UserCreate) -> User:
         prenom = user.prenom or ""
     
     db_user = User(
-        matricule=matricule,
+        matricule=user.matricule,
         email=user.email,
         hashed_password=hashed_password,
         nom=nom,
         prenom=prenom,
         phone=user.phone,
+        niveau_id=user.niveau_id,
         fonction=user.fonction,
         date_et_lieu_naissance=user.date_et_lieu_naissance,
         is_active=False,  # Pas actif par défaut
@@ -152,6 +172,23 @@ def create_user(db: Session, user: UserCreate) -> User:
     db.refresh(db_user)
 
     create_notifications_for_register(db, db_user, TypeNotif.REGISTER)
+
+    # -------- Email preparation -----------
+    admin_emails = get_admin_emails(db)
+
+    if len(admin_emails) != 0:
+        email_data = EmailSchema(
+            receivers=admin_emails,
+            subject="Action Requise : Nouvelle Inscription en Attente de Validation",
+            body=f"Bonjour, L'utilisateur {db_user.full_name} (Matricule/Email : {db_user.matricule if db_user.matricule else db_user.email}) s'est inscrit et son compte est actuellement en attente. Votre validation est nécessaire pour lui donner accès à la plateforme.",
+            optional_input=None
+        )
+        await send_email_async(
+            email_data=email_data,
+            background_tasks=background_task,
+            type_notif=TypeNotif.REGISTER,
+            document=None
+        )
     return db_user
 
 
@@ -170,9 +207,62 @@ def get_user_by_id(db: Session, user_id: str) -> Optional[User]:
     return db.query(User).filter(User.id == user_id).first()
 
 
-def get_all_users(db: Session, skip: int = 0, limit: int = 100) -> List[User]:
+def get_all_users(db: Session, filter: UserRequestFilter) -> tuple[List[User], PaginationMeta]:
     """Récupère tous les utilisateurs"""
-    return db.query(User).filter(User.is_deleted == False).offset(skip).limit(limit).all()
+    stmt = select(User).options(
+        joinedload(User.niveau)
+    )
+
+    conditions = []
+    if filter.type:
+        conditions.append(User.type == filter.type)
+    if filter.status:
+        conditions.append(User.is_active == filter.status)
+    if filter.search_term :
+        search_like = f"%{filter.search_term}%"
+        search_condition = (
+            User.matricule.ilike(search_like)) | (
+            User.nom.ilike(search_like)) | (
+            User.prenom.ilike(search_like)
+        )
+
+    if conditions:
+        stmt = stmt.where(and_(*conditions))
+
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total_items = db.execute(count_stmt).scalar_one()
+
+    # --- Application de la Pagination ---
+    per_page = filter.per_page
+    # Calcul du nombre total de pages
+    if total_items > 0:
+        page_total = math.ceil(total_items / per_page)
+    else:
+        page_total = 0
+    # S'assurer que la page demandée n'est pas hors limite
+    page = filter.page
+    if page > page_total and page_total > 0:
+        page = page_total  # Ramener à la dernière page
+    # Calcul de l'offset (skip)
+    skip = (page - 1) * per_page
+
+    stmt_final = stmt.order_by(User.id.desc())
+    # Gérer le cas 'all=True' (Admin seulement)
+    if filter.all is False:
+        stmt_final = stmt_final.offset(skip).limit(per_page)
+
+    result = db.execute(stmt_final)
+    users = result.scalars().all()
+
+    # Création des métadonnées de pagination
+    pagination_meta = PaginationMeta(
+        page=page,
+        page_total=page_total,
+        per_page=per_page,
+        total_items=total_items
+    )
+
+    return users, pagination_meta
 
 
 def get_pending_users(db: Session) -> List[User]:
@@ -217,7 +307,12 @@ def delete_user(db: Session, user_id: str) -> bool:
 
 
 # CRUD pour Document (DocumentRequest est un alias)
-def create_document_request(db: Session, request: DocumentCreateSchema, user_id: str) -> Document:
+async def create_document_request(
+        db: Session,
+        request: DocumentCreateSchema,
+        user_id: str,
+        background_task: BackgroundTasks
+) -> Document:
     """Crée une nouvelle demande de document"""
     # 1.1 Créer l'objet Document
     db_request = Document(
@@ -280,6 +375,22 @@ def create_document_request(db: Session, request: DocumentCreateSchema, user_id:
         # On pourrait logguer ceci sans faire un rollback du document.
         print(f"Erreur lors du commit des notifications : {e}")
         db.rollback()
+
+    # -------- Email preparation -----------
+    admin_emails = get_admin_emails(db)
+    if len(admin_emails) != 0:
+        email_data = EmailSchema(
+            receivers=admin_emails,
+            subject=f"Demande Étudiante Reçue : {db_request.categorie.designation}",
+            body=f"Une nouvelle demande de document vient d'être soumise par l'étudiant {db_request.user.full_name} (Matricule : {db_request.user.matricule}). La demande concerne : {db_request.categorie.designation}. Veuillez examiner cette demande depuis le tableau de bord.",
+            optional_input=None
+        )
+        await send_email_async(
+            email_data=email_data,
+            background_tasks=background_task,
+            type_notif=TypeNotif.REQUEST,
+            document=db_request
+        )
 
     return db_request
 
@@ -449,7 +560,12 @@ def get_document_requests_filtered(
 
 
 
-def update_document_request(db: Session, request_id: int, request_update: DocumentRequestUpdate) -> Optional[Document]:
+async def update_document_request(
+    db: Session,
+    request_id: int,
+    request_update: DocumentRequestUpdate,
+    background_task: BackgroundTasks,
+) -> Optional[Document]:
     """Met à jour une demande"""
     db_request = db.query(Document).options(joinedload(Document.categorie), joinedload(Document.user)).filter(Document.id == request_id).first()
     if not db_request:
@@ -492,6 +608,21 @@ def update_document_request(db: Session, request_id: int, request_update: Docume
     except Exception as e:
         print(f"Erreur lors du commit des notifications : {e}")
         db.rollback()
+
+    # ----------------- EMAIL FUNCTION ----------------
+
+    email_data = EmailSchema(
+        receivers=[db_request.user.email],
+        subject=f"Votre Demande de Document (N°: {db_request.numero}) a été Validée",
+        body=f"Nous avons le plaisir de vous informer que votre demande (N°: {db_request.numero}) concernant {db_request.categorie.designation} a été examinée et approuvée par nos services. Vous pouvez désormais la retirer auprès de la scolarité.",
+        optional_input=None
+    )
+    await send_email_async(
+        email_data=email_data,
+        background_tasks=background_task,
+        type_notif=TypeNotif.VALIDATION,
+        document=db_request
+    )
 
     return db_request
 

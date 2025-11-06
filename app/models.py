@@ -31,7 +31,7 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4(), unique=True, nullable=False)
-    matricule = Column(String, unique=True, index=True, nullable=False)  # Identifiant unique
+    matricule = Column(String, unique=True, index=True, nullable=True)  # Identifiant unique
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     nom = Column(String, nullable=False)  # Nom de famille
@@ -49,13 +49,14 @@ class User(Base):
     # Relations
     documents = relationship("Document", back_populates="user")
     notifications = relationship("Notification", back_populates="user")
+    niveau = relationship("Niveau", back_populates="user")
 
     # niveau = relationship("Niveau", back_populates="user")
 
     @hybrid_property
     def full_name(self):
         """Retourne le nom complet (nom + prénom)"""
-        return f"{self.prenom} {self.nom}" if self.prenom and self.nom else ""
+        return f"{self.nom} {self.prenom}" if self.prenom and self.nom else ""
 
     @full_name.setter
     def full_name(self, value):
@@ -63,11 +64,11 @@ class User(Base):
         if value:
             parts = value.split(maxsplit=1)
             if len(parts) >= 2:
-                self.prenom = parts[0]
-                self.nom = parts[1]
+                self.nom = parts[0]
+                self.prenom = parts[1]
             elif len(parts) == 1:
-                self.prenom = parts[0]
-                self.nom = ""
+                self.nom = parts[0]
+                self.prenom = ""
 
     # Alias pour compatibilité avec l'ancien code
     @hybrid_property
@@ -89,7 +90,7 @@ class Niveau(Base):
 
     # Relations
     documents = relationship("Document", back_populates="niveau")
-    # users = relationship("User", back_populates="niveau")
+    users = relationship("User", back_populates="niveau")
 
 
 class AnneeUniv(Base):

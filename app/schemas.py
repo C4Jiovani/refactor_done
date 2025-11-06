@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, UUID4, Field
+from pydantic import BaseModel, EmailStr, UUID4, Field, ConfigDict
 from datetime import datetime, date
 from typing import Optional, List
 
@@ -24,20 +24,42 @@ class UserCreate(UserBase):
     password: str
     niveau_id: int
 
+class UserRequestFilter(BaseModel):
+    """Schéma Pydantic pour les paramètres de filtrage des demandes de documents."""
+
+    search_term: Optional[str] = Field(None, description="Terme de recherche libre: Nom, Matricule, nom, prenom, de document.")
+    type: Optional[str] = Field(None, description="Chercher le type de compte (etudiant, admin, sco)")
+    status: Optional[bool] = Field(None, description="Etat d'activation du compte")
+
+    # --- Nouveaux Paramètres de Pagination ---
+    page: int = Field(1, ge=1, description="Numéro de la page à retourner (doit être >= 1).")
+    per_page: int = Field(10, ge=1, le=100, description="Nombre d'éléments par page (entre 1 et 100).")
+    all: bool = Field(False, description="Si True, ignore la pagination et retourne tous les résultats (admin seulement).")
+
+class NiveauSchema(BaseModel):
+    id:int
+    designation: str
+    model_config = ConfigDict(from_attributes=True)
 
 class UserResponse(UserBase):
     id: UUID4
-    matricule: str
+    matricule: Optional[str] = None
     nom: str
     prenom: str
     full_name: str  # Propriété calculée
     is_active: bool
     role: str
     type: str
+    niveau: Optional[NiveauSchema] = None
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+class PaginatedUserRequestResponse(BaseModel):
+    """Schéma de réponse complet incluant les données et les informations de pagination."""
+    data: List[UserResponse]
+    pagination: PaginationMeta
 
 
 class UserUpdate(BaseModel):
@@ -224,3 +246,10 @@ class NotificationResponseSchema(BaseModel):
 
 class NotificationSeenSchema(BaseModel):
     notif_ids: List[int]
+
+class EmailSchema(BaseModel):
+    receivers: List[EmailStr]
+    subject: str
+    body: str
+    optional_input: Optional[str] = None
+

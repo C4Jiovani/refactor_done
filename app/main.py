@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -10,16 +10,18 @@ from starlette.status import HTTP_201_CREATED, HTTP_200_OK
 from app.database import get_db, engine, Base
 from app.models import User, Document, Niveau, Notification
 from app.schemas import (
-    UserCreate, UserResponse, UserUpdate, Token, LoginRequest,
+    UserCreate, UserResponse, UserUpdate, Token, LoginRequest, UserRequestFilter,
     DocumentRequestCreate, DocumentRequestResponse, DocumentRequestUpdate, DocumentRequestCLientUpdate,
     DocumentRequestFilter, PaginatedDocumentRequestResponse, DocumentCreateSchema,
     MultipleRequestsCreate, NotificationMessage,
     NiveauResponseSchema, NiveauCreateRequest,
     CategoriCreateRequest, CategoriResponseSchema,
     NotificationResponseSchema, NotificationSeenSchema,
+    PaginatedUserRequestResponse,
 )
 from app.auth import (
     authenticate_user, create_access_token, get_current_active_user,
+    get_current_sco_or_admin_user, get_current_sco_user,
     get_current_admin_user, ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from app.crud import (
@@ -56,7 +58,7 @@ app.add_middleware(
 # ==================== ROUTES D'AUTHENTIFICATION ====================
 
 @app.post("/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(user: UserCreate, db: Session = Depends(get_db)):
+async def register(user: UserCreate, background_task: BackgroundTasks, db: Session = Depends(get_db)):
     """Inscription d'un nouvel utilisateur (compte non actif par défaut)"""
     # Vérifier si l'email existe déjà
     db_user = get_user_by_email(db, email=user.email)
@@ -66,7 +68,7 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
             detail="Email already registered"
         )
     
-    new_user = create_user(db=db, user=user)
+    new_user = await create_user(db=db, user=user, background_task=background_task)
     return new_user
 
 
@@ -102,16 +104,19 @@ async def read_users_me(current_user: User = Depends(get_current_active_user)):
     return current_user
 
 
-@app.get("/users", response_model=List[UserResponse])
+@app.get("/users", response_model=PaginatedUserRequestResponse)
 async def read_all_users(
-    skip: int = 0,
-    limit: int = 100,
+    data: UserRequestFilter = Depends(),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
 ):
     """Récupère tous les utilisateurs (admin seulement)"""
-    users = get_all_users(db, skip=skip, limit=limit)
-    return users
+    users, pagination_meta = get_all_users(db, data)
+    result = PaginatedUserRequestResponse(
+        data=users,
+        pagination=pagination_meta
+    )
+    return result
 
 
 @app.get("/users/pending", response_model=List[UserResponse])
@@ -181,7 +186,7 @@ async def delete_user_endpoint(
 async def read_demand_all_requests(
     filters: DocumentRequestFilter = Depends(),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_sco_or_admin_user)
 ):
     """
     Récupère les demandes de documents avec support de pagination et de filtres.
@@ -222,25 +227,28 @@ async def read_single_demand_request(
 @app.post("/requests", response_model=DocumentRequestResponse, status_code=status.HTTP_201_CREATED)
 async def create_requests(
     requests_data: DocumentCreateSchema,
+    background_task: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     # requests_data: MultipleRequestsCreate,
     """Crée une ou plusieurs demandes de documents en une seule requête"""
-    db_requests = create_document_request(
+    db_requests = await create_document_request(
         db=db,
         request=requests_data,
-        user_id=str(current_user.id)
+        user_id=str(current_user.id),
+        background_task=background_task
     )
     return db_requests
 
 
 @app.put("/requests/{request_id}", response_model=DocumentRequestResponse)
-async def update_request(
+async def validate_request(
     request_id: int,
     request_update: DocumentRequestUpdate,
+        background_task: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin_user)
+    current_user: User = Depends(get_current_sco_or_admin_user)
 ):
     """Met à jour le statut d'une demande (admin seulement)"""
     db_request = get_document_request_by_id(db, request_id=request_id)
@@ -248,7 +256,7 @@ async def update_request(
         raise HTTPException(status_code=404, detail="Request not found")
 
     old_status = db_request.status
-    updated_request = update_document_request(db, request_id=request_id, request_update=request_update)
+    updated_request = await update_document_request(db, request_id=request_id, request_update=request_update, background_task=background_task)
 
     # Envoyer une notification si le statut a changé
     if request_update.status and request_update.status != old_status:
