@@ -7,11 +7,12 @@ from app.models import User, Document, UserRole, DocumentStatus, Categori, Nivea
 from app.schemas import (
     UserCreate, UserUpdate, DocumentRequestCreate, DocumentRequestUpdate, DocumentRequestFilter,
     DocumentCreateSchema, DocumentRequestCLientUpdate,
-    NiveauCreateRequest,
+    NiveauCreateRequest, AblyMessage,
     CategoriCreateRequest, PaginationMeta,
-    NotificationSeenSchema, EmailSchema, UserRequestFilter
+    NotificationSeenSchema, EmailSchema, UserRequestFilter, NotificationResponseSchema
 )
 from .services.mail_service import send_email_async
+from .services.ably_service import send_message
 
 from app.auth import get_password_hash
 from typing import List, Optional
@@ -79,7 +80,7 @@ def create_notifications_for_user(
         document: Document,
         notif_type: TypeNotif,
         # content: str,
-) -> List[Notification]:
+) -> Notification:
     """
     Crée une notification pour tous les utilisateurs n'ayant pas le rôle spécifié.
     Utilisé ici pour les notifications de type REQUEST.
@@ -171,7 +172,23 @@ async def create_user(db: Session, user: UserCreate, background_task: Background
     db.commit()
     db.refresh(db_user)
 
-    create_notifications_for_register(db, db_user, TypeNotif.REGISTER)
+    notifs = create_notifications_for_register(db, db_user, TypeNotif.REGISTER)
+    if len(notifs) > 0:
+        notification_schema = NotificationResponseSchema(
+            id=notifs[0].id,
+            user=notifs[0].user,
+            document=notifs[0].document,
+            contenu=notifs[0].contenu,
+            type_notif=notifs[0].type_notif
+        )
+
+        msg = AblyMessage(
+            channel=f"admin_sco",
+            publisher="register",
+            content=notification_schema
+        )
+        await send_message(msg)
+
 
     # -------- Email preparation -----------
     admin_emails = get_admin_emails(db)
@@ -356,13 +373,29 @@ async def create_document_request(
     notif_content = f"Nouvelle demande de document à examiner N°: {db_request.numero}, Categori : {db_request.categorie.designation})."
 
     # Créer une notification pour tous les utilisateurs sauf "student"
-    create_notifications_for_roles(
+    notifs = create_notifications_for_roles(
         db=db,
         document=db_request,
         notif_type=TypeNotif.REQUEST,
         content=notif_content,
         excluded_role="etudiant"
     )
+
+    if len(notifs) > 0:
+        notification_schema = NotificationResponseSchema(
+            id=notifs[0].id,
+            user=notifs[0].user,
+            document=notifs[0].document,
+            contenu=notifs[0].contenu,
+            type_notif=notifs[0].type_notif
+        )
+
+        msg = AblyMessage(
+            channel=f"admin_sco",
+            publisher="request",
+            content=notification_schema
+        )
+        await send_message(msg)
 
     # Il est crucial de faire un second commit pour les notifications.
     # On pourrait aussi envelopper tout dans une seule transaction,
@@ -588,19 +621,32 @@ async def update_document_request(
         setattr(db_request, field, value)
 
     db_request.updated_at = datetime.now()
-    
+    notifiation_schema = None
     # Si le statut passe à validé, mettre à jour date_de_validation
     if update_data.get('status') == DocumentStatus.VALIDATE.value:
         db_request.date_de_validation = datetime.now()
 
 
         # --- 5. Création des Notifications (Après le Commit) ---
-        # notif_content = f"Nouvelle demande de document à examiner (ID: {db_request.numero}, Categori : {db_request.categorie.designation})."
-        create_notifications_for_user(
+        notif = create_notifications_for_user(
             db=db,
             document=db_request,
             notif_type=TypeNotif.VALIDATION,
         )
+        notification_schema = NotificationResponseSchema(
+            id=notif.id,
+            user=notif.user,
+            document=notif.document,
+            contenu=notif.contenu,
+            type_notif=notif.type_notif
+        )
+
+        msg = AblyMessage(
+            channel=f"client-{notif.user.id}",
+            publisher="validation",
+            content=notification_schema
+        )
+        await send_message(msg)
 
     try:
         db.commit()
@@ -608,6 +654,8 @@ async def update_document_request(
     except Exception as e:
         print(f"Erreur lors du commit des notifications : {e}")
         db.rollback()
+
+
 
     # ----------------- EMAIL FUNCTION ----------------
 

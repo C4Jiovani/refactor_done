@@ -256,5 +256,5 @@ class EmailSchema(BaseModel):
 # ==================== REALTIME CONTENT (CRUD) ====================
 class AblyMessage(BaseModel):
     channel: str
-    # content: dict
-    content: str
+    publisher: dict
+    content: NotificationResponseSchema | DocumentResponse

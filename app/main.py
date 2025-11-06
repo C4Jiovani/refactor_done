@@ -428,10 +428,7 @@ def notification_unseen_requests(
 async def test_realtime():
     msg = AblyMessage(
         channel="admin",
-        # content={
-        #     "test": True,
-        #     "next": "From Ably"
-        # }
+        publisher="register",
         content="Hello world"
     )
     await send_message(msg)
