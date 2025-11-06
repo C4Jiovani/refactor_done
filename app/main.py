@@ -32,7 +32,7 @@ from app.crud import (
     get_user_document_requests, update_document_request, update_document_client_request, delete_document_request,
     get_all_niveau, create_niveau, update_niveau, delete_niveau, get_a_niveau,
     get_a_categori, get_all_categori, create_categori, update_categori, delete_categori,
-    get_notification_for_active_user, mark_as_seen
+    get_notification_for_active_user, mark_as_seen, get_all_stats_for_dashboard,
 )
 from app.services.websocket_manager import manager
 from app.services.ably_service import send_message
@@ -423,13 +423,13 @@ def notification_unseen_requests(
     rows_updated = mark_as_seen(db, data.notif_ids, current_user.id)
     return {"message": f"{rows_updated} notification(s) marquée(s) comme lue(s)."}
 
-@app.put("/notification", status_code=HTTP_200_OK)
-def notification_unseen_requests(
+@app.get("/stats/dashboard", status_code=HTTP_200_OK)
+async def dashboard_stat_requests(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_sco_or_admin_user)
 ):
-    rows_updated = mark_as_seen(db, data.notif_ids, current_user.id)
-    return {"message": f"{rows_updated} notification(s) marquée(s) comme lue(s)."}
+    stats = await get_all_stats_for_dashboard(db)
+    return stats
 
 
 

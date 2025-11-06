@@ -22,7 +22,7 @@ async def send_message(msg: AblyMessage,):
         #     msg.content.model_dump() if hasattr(msg.content, "model_dump") else msg.content
         # )
         payload = jsonable_encoder(msg.content)
-
+        print(payload)
         # Ably attend un texte ou un objet dict JSON-sérialisable
         # await channel.publish(msg.publisher, json.dumps(content))
         await channel.publish(msg.publisher, payload)

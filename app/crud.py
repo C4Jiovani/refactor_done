@@ -18,7 +18,7 @@ from app.auth import get_password_hash
 from typing import List, Optional
 import secrets
 import math
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 # --- FONCTION UTILITAIRE DE NOTIFICATION ---
@@ -842,6 +842,7 @@ def mark_as_seen(db: Session, notif_ids: List[int], user_uuid: UUID):
 async def get_all_stats_for_dashboard(db:Session):
     current_month = datetime.now().month
     current_year = datetime.now().year
+    twelve_months_ago = datetime.now() - timedelta(days=365)
 
     # === 1️⃣ Indicateurs généraux ===
     total_docs = db.query(func.count(Document.id)).scalar()
@@ -881,6 +882,7 @@ async def get_all_stats_for_dashboard(db:Session):
     docs_by_category = (
         db.query(Categori.designation, func.count(Document.id))
         .join(Document, Document.categorie_id == Categori.id)
+        .filter(Document.date_de_demande >= twelve_months_ago)
         .group_by(Categori.designation)
         .all()
     )
@@ -893,6 +895,33 @@ async def get_all_stats_for_dashboard(db:Session):
         .all()
     )
 
+    return {
+        "global": {
+            "total_documents": total_docs,
+            "pending": total_pending,
+            "validated": total_validated,
+            "refused": total_refused,
+            "paid": total_paid,
+            "students": total_students,
+            "students_pending": total_students_pending,
+            "total_revenue": total_revenue,
+            # "average_validation_delay_h": avg_validation_delay or 0
+        },
+        "monthly": {
+            "documents_this_month": dmd_this_month,
+            "validated_this_month": validated_this_month,
+        },
+        "by_category": [
+            {"category": cat, "count": count} for cat, count in docs_by_category
+        ],
+        # "by_level": [
+        #     {"level": lvl, "count": count} for lvl, count in docs_by_level
+        # ],
+        # "notifications": {
+        #     "total": total_notifications,
+        #     "unread": total_unread
+        # }
+    }
 
 
 
