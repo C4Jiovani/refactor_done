@@ -70,6 +70,8 @@ class UserUpdate(BaseModel):
     phone: Optional[str] = None
     fonction: Optional[str] = None
     is_active: Optional[bool] = None
+    type: Optional[str] = None
+
 
 
 # Schémas pour Auth
