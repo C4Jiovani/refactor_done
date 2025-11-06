@@ -437,8 +437,11 @@ def update_document_client_request(db: Session, request: DocumentRequestCLientUp
 
     if request.pere is not None :
         db_request.pere = request.pere
-    if db_request.mere is not None:
+    if request.mere is not None:
         db_request.pere = request.mere
+    if request.categorie_id is not None:
+        db_request.categorie_id = request.categorie_id
+
     print(db_request.categorie.with_info)
 
     if request.infosupps is not None and db_request.categorie.with_info:

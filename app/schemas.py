@@ -207,6 +207,7 @@ class DocumentRequestUpdate(BaseModel):
 class DocumentRequestCLientUpdate(BaseModel):
     pere: Optional[str] = None # pending, validate, refused
     mere: Optional[bool] = None
+    categorie_id: Optional[int] = None
     infosupps: Optional[List[InfoSuppSchema]] = None
 
 
