@@ -253,3 +253,8 @@ class EmailSchema(BaseModel):
     body: str
     optional_input: Optional[str] = None
 
+# ==================== REALTIME CONTENT (CRUD) ====================
+class AblyMessage(BaseModel):
+    channel: str
+    # content: dict
+    content: str

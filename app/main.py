@@ -17,7 +17,7 @@ from app.schemas import (
     NiveauResponseSchema, NiveauCreateRequest,
     CategoriCreateRequest, CategoriResponseSchema,
     NotificationResponseSchema, NotificationSeenSchema,
-    PaginatedUserRequestResponse,
+    PaginatedUserRequestResponse, AblyMessage,
 )
 from app.auth import (
     authenticate_user, create_access_token, get_current_active_user,
@@ -35,6 +35,7 @@ from app.crud import (
     get_notification_for_active_user, mark_as_seen
 )
 from app.services.websocket_manager import manager
+from app.services.ably_service import send_message
 
 # Créer les tables de la base de données
 Base.metadata.create_all(bind=engine)
@@ -423,6 +424,19 @@ def notification_unseen_requests(
     return {"message": f"{rows_updated} notification(s) marquée(s) comme lue(s)."}
 
 
+@app.get("/send", status_code=HTTP_200_OK)
+async def test_realtime():
+    msg = AblyMessage(
+        channel="admin",
+        # content={
+        #     "test": True,
+        #     "next": "From Ably"
+        # }
+        content="Hello world"
+    )
+    await send_message(msg)
+
+    return {"status": "success", "sent": True}
 
 
 
