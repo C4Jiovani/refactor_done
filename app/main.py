@@ -398,7 +398,7 @@ def update_categori_requests(
 @app.put("/categori/minor_update/{categori_id}", response_model=CategoriResponseSchema, status_code=HTTP_200_OK)
 def update_categori_requests(
     categori_id: int,
-    request_data: CategoriCreateRequest,
+    request_data: CategorieMinorUpdateSchema,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
 ):

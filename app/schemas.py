@@ -15,6 +15,7 @@ class UserBase(BaseModel):
     matricule: Optional[str] = None
     nom: Optional[str] = None
     prenom: Optional[str] = None
+    type: Optional[str] = None
     phone: Optional[str] = None
     fonction: Optional[str] = None
     date_et_lieu_naissance: Optional[str] = None
@@ -22,7 +23,7 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
-    niveau_id: int
+    niveau_id: Optional[int] = None
 
 class UserRequestFilter(BaseModel):
     """Schéma Pydantic pour les paramètres de filtrage des demandes de documents."""
