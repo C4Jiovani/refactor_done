@@ -9,7 +9,7 @@ from app.schemas import (
     DocumentCreateSchema, DocumentRequestCLientUpdate,
     NiveauCreateRequest, AblyMessage,
     CategoriCreateRequest, PaginationMeta,
-    NotificationSeenSchema, EmailSchema, UserRequestFilter, NotificationResponseSchema
+    NotificationSeenSchema, EmailSchema, UserRequestFilter, NotificationResponseSchema, CategorieMinorUpdateSchema
 )
 from .services.mail_service import send_email_async
 from .services.ably_service import send_message
@@ -790,6 +790,23 @@ def update_categori(db:Session, request: CategoriCreateRequest, categori_id: int
         categori.montant = request.montant
         categori.contenu_notif = request.contenu_notif
         categori.is_visible = request.is_visible
+
+        db.commit()
+        db.refresh(categori)
+        return categori
+    except IntegrityError:
+        db.rollback()
+        return None
+
+def update_minor_categori(db: Session, request: CategorieMinorUpdateSchema, categori_id: int) -> Categori | None:
+    try:
+        categori = get_a_categori(db, categori_id)
+        if categori is None:
+            return None
+
+        categori.designation = request.designation
+        categori.montant = request.montant
+        categori.contenu_notif = request.contenu_notif
 
         db.commit()
         db.refresh(categori)

@@ -17,7 +17,7 @@ from app.schemas import (
     NiveauResponseSchema, NiveauCreateRequest,
     CategoriCreateRequest, CategoriResponseSchema,
     NotificationResponseSchema, NotificationSeenSchema,
-    PaginatedUserRequestResponse, AblyMessage,
+    PaginatedUserRequestResponse, AblyMessage, CategorieMinorUpdateSchema
 )
 from app.auth import (
     authenticate_user, create_access_token, get_current_active_user,
@@ -33,6 +33,7 @@ from app.crud import (
     get_all_niveau, create_niveau, update_niveau, delete_niveau, get_a_niveau,
     get_a_categori, get_all_categori, create_categori, update_categori, delete_categori,
     get_notification_for_active_user, mark_as_seen, get_all_stats_for_dashboard,
+update_minor_categori
 )
 from app.services.websocket_manager import manager
 from app.services.ably_service import send_message
@@ -391,6 +392,17 @@ def update_categori_requests(
     current_user: User = Depends(get_current_admin_user)
 ):
     result = update_categori(db, request_data, categori_id)
+    return result
+
+
+@app.put("/categori/minor_update/{categori_id}", response_model=CategoriResponseSchema, status_code=HTTP_200_OK)
+def update_categori_requests(
+    categori_id: int,
+    request_data: CategoriCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    result = update_minor_categori(db, request_data, categori_id)
     return result
 
 @app.delete("/categori/{categori_id}", status_code=status.HTTP_204_NO_CONTENT)

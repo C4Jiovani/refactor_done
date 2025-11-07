@@ -272,5 +272,7 @@ class AblyMessage(BaseModel):
     #     else:
     #         return {"message": str(self.content)}
 
-class DashboardStatsResponse(BaseModel):
-    pass
+class CategorieMinorUpdateSchema(BaseModel):
+    designation : Optional[str] = None
+    montant: Optional[float] = None
+    contenu_notif: Optional[str] = None
