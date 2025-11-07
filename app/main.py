@@ -226,7 +226,7 @@ async def read_single_demand_request(
     return db_request
 
 
-@app.post("/requests", response_model=DocumentRequestResponse, status_code=status.HTTP_201_CREATED)
+@app.post("/requests",response_model=DocumentRequestResponse,status_code=status.HTTP_201_CREATED)
 async def create_requests(
     requests_data: DocumentCreateSchema,
     background_task: BackgroundTasks,
@@ -243,7 +243,6 @@ async def create_requests(
     )
     return db_requests
 
-
 @app.put("/requests/{request_id}", response_model=DocumentRequestResponse)
 async def validate_request(
     request_id: int,
@@ -259,21 +258,6 @@ async def validate_request(
 
     old_status = db_request.status
     updated_request = await update_document_request(db, request_id=request_id, request_update=request_update, background_task=background_task)
-
-    # Envoyer une notification si le statut a changé
-    if request_update.status and request_update.status != old_status:
-        notification_message = {
-            "type": "request_status_changed",
-            "message": f"Le statut de votre demande a changé: {request_update.status}",
-            "data": {
-                "request_id": request_id,
-                "est_paye": request_update.est_paye,
-                "old_status": old_status,
-                "new_status": request_update.status,
-                "document_type": updated_request.document_type
-            }
-        }
-        await manager.send_personal_message(notification_message, updated_request.user_id)
     return updated_request
 
 

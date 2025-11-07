@@ -166,7 +166,7 @@ async def create_user(db: Session, user: UserCreate, background_task: Background
         fonction=user.fonction,
         date_et_lieu_naissance=user.date_et_lieu_naissance,
         is_active=False,  # Pas actif par défaut
-        type=UserRole.ETUDIANT.value
+        type=UserRole.SCO.value if user.type != None else UserRole.ETUDIANT.value
     )
     db.add(db_user)
     db.commit()
