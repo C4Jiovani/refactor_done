@@ -296,7 +296,7 @@ async def update_for_client_request(
 async def delete_request(
     request_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_admin_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """Supprime une demande (admin seulement)"""
     success = delete_document_request(db, request_id=request_id)
